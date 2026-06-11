@@ -1,0 +1,18 @@
+apiVersion: plugin.halo.run/v1alpha1
+kind: Plugin
+metadata:
+  name: PluginCodeEnhance
+spec:
+  version: 1.0.0
+  requires: ">=2.20.0"
+  author:
+    name: "吴蛋蛋"
+    website: https://wuqishi.com
+  logo: https://wuqishi.com/dan.svg
+  settingName: plugin-code-enhance-settings
+  configMapName: plugin-code-enhance-configMap
+  displayName: "代码增强（高亮+折叠+长图折叠）"
+  description: "集成 Highlight.js 代码高亮、代码块折叠和长图折叠功能等"
+  license:
+    - name: "GPL-3.0"
+      url: "https://opensource.org/licenses/GPL-3.0"

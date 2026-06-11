@@ -1,0 +1,387 @@
+/**
+ * PluginCodeEnhance - 折叠、高亮、行号、标题栏样式
+ * 所有类名以 ce- 前缀避免主题冲突
+ * 配色由 JS 根据高亮主题动态注入 CSS 变量
+ */
+
+:root {
+    --ce-btn-color: #fff;
+    --ce-btn-bg: rgba(0, 0, 0, 0.55);
+    --ce-btn-hover-bg: rgba(0, 0, 0, 0.75);
+    --ce-btn-radius: 16px;
+    --ce-header-bg: #e8ecf1;
+    --ce-header-color: #24292e;
+    --ce-line-num-color: #adb5bd;
+    --ce-line-num-width: 3em;
+    --ce-code-bg: #fff;
+    --ce-border-color: #d1d5da;
+}
+
+/* ==================== 代码块容器 ==================== */
+.ce-fold-wrap {
+    margin: 16px 0;
+    border-radius: 8px;
+    background: var(--ce-code-bg);
+    border: 1px solid var(--ce-border-color);
+    position: relative;
+    overflow: visible;
+}
+
+.ce-fold-wrap > pre {
+    position: relative;
+    margin: 0;
+    border: none;
+    box-shadow: none;
+    background: transparent !important;
+}
+
+/* ==================== 标题栏 ==================== */
+.ce-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: var(--ce-header-bg);
+    border-bottom: 1px solid var(--ce-border-color);
+    border-radius: 8px 8px 0 0;
+    font-size: 12px;
+    color: var(--ce-header-color);
+    user-select: none;
+}
+
+.ce-header-dots {
+    display: flex;
+    gap: 6px;
+}
+
+.ce-header-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.ce-header-dot--red { background: #ff5f57; }
+.ce-header-dot--yellow { background: #febc2e; }
+.ce-header-dot--green { background: #28c840; }
+
+.ce-header-lang {
+    font-family: monospace;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 11px;
+}
+
+.ce-header-copy {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid var(--ce-border-color);
+    color: var(--ce-header-color);
+    transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    min-height: 28px;
+    display: flex;
+    align-items: center;
+}
+
+.ce-header-copy:hover {
+    background: rgba(128, 128, 128, 0.12);
+}
+
+.ce-header-copy:active {
+    background: rgba(128, 128, 128, 0.2);
+    transform: scale(0.98);
+}
+
+.ce-header-copy--copied {
+    color: #28c840;
+    border-color: #28c840;
+}
+
+/* 标题栏右侧操作按钮容器 */
+.ce-header-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+/* 折叠/展开按钮 */
+.ce-header-fold {
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid var(--ce-border-color);
+    color: var(--ce-header-color);
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 28px;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.ce-header-fold:hover {
+    background: rgba(128, 128, 128, 0.12);
+}
+
+.ce-header-fold:active {
+    background: rgba(128, 128, 128, 0.2);
+    transform: scale(0.98);
+}
+
+.ce-header-fold-icon {
+    font-size: 9px;
+    transition: transform 0.2s;
+    line-height: 1;
+}
+
+/* 默认显示"展开"图标（▼），隐藏"收起"图标（◀） */
+.ce-header-fold-icon--fold {
+    display: none;
+}
+
+/* 完全折叠状态：显示"收起"图标（◀），隐藏"展开"图标（▼） */
+.ce-header-fold--folded .ce-header-fold-icon--unfold {
+    display: none;
+}
+
+.ce-header-fold--folded .ce-header-fold-icon--fold {
+    display: inline;
+}
+
+/* 完全折叠：隐藏 pre 和底部按钮 */
+.ce-fully-folded > pre {
+    display: none !important;
+}
+
+.ce-fully-folded > .ce-expand-btn,
+.ce-fully-folded > .ce-collapse-btn {
+    display: none !important;
+}
+
+.ce-fully-folded {
+    border-bottom: none;
+}
+
+.ce-fully-folded > .ce-header {
+    border-radius: 8px;
+    border-bottom: none;
+    cursor: pointer;
+}
+
+.ce-fully-folded > .ce-header:hover {
+    filter: brightness(0.95);
+}
+
+/* 有标题栏时，pre 不需要顶部圆角 */
+.ce-fold-wrap:has(.ce-header) > pre {
+    border-radius: 0 0 8px 8px;
+}
+
+/* ==================== 行号（Grid 布局）==================== */
+.ce-code-grid {
+    display: grid;
+    grid-template-columns: var(--ce-line-num-width) 1fr;
+    gap: 0;
+    width: 100%;
+}
+
+.ce-line-num {
+    grid-column: 1;
+    width: var(--ce-line-num-width);
+    min-width: var(--ce-line-num-width);
+    padding: 0 8px 0 12px;
+    text-align: right;
+    color: var(--ce-line-num-color);
+    font-size: 0.85em;
+    font-family: monospace;
+    line-height: inherit;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.ce-line-code {
+    grid-column: 2;
+    padding: 0 12px 0 8px;
+    white-space: pre;
+    line-height: inherit;
+}
+
+.ce-code-grid > .ce-line-num:nth-child(odd):hover + .ce-line-code,
+.ce-code-grid > .ce-line-code:nth-child(even):hover {
+    background: rgba(128, 128, 128, 0.05);
+}
+
+/* ==================== 代码折叠（收缩状态） ==================== */
+.ce-code-fold {
+    max-height: var(--ce-fold-height, 320px) !important;
+    overflow-y: auto !important;
+    overflow-x: auto !important;
+    position: relative;
+    transition: max-height 0.35s ease;
+    border: none;
+    box-shadow: none;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.ce-code-fold::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+/* ==================== 代码展开状态 ==================== */
+.ce-code-unfold {
+    max-height: none !important;
+    overflow: auto !important;
+    border: none;
+    box-shadow: none;
+}
+
+/* ==================== 收缩渐变遮罩 ==================== */
+.ce-code-fold::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    background: linear-gradient(transparent, var(--ce-code-bg));
+    pointer-events: none;
+    z-index: 1;
+}
+
+.ce-code-unfold::after {
+    display: none;
+}
+
+/* ==================== 展开/收起按钮（通用） ==================== */
+.ce-expand-btn,
+.ce-img-expand-btn,
+.ce-collapse-btn {
+    padding: 5px 14px;
+    border-radius: var(--ce-btn-radius);
+    font-size: 12px;
+    line-height: 1.4;
+    cursor: pointer;
+    background: var(--ce-btn-bg);
+    border: none;
+    color: var(--ce-btn-color);
+    transition: all 0.2s;
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    letter-spacing: 0.5px;
+}
+
+.ce-expand-btn:hover,
+.ce-img-expand-btn:hover,
+.ce-collapse-btn:hover {
+    background: var(--ce-btn-hover-bg);
+}
+
+/* 收缩状态：展开按钮 sticky 固定在滚动容器底部 */
+.ce-fold-wrap > .ce-expand-btn {
+    position: sticky;
+    bottom: 10px;
+    z-index: 2;
+    display: flex;
+    margin: -36px auto 10px;
+    pointer-events: auto;
+}
+
+/* 展开状态：收起按钮在代码块底部居中 */
+.ce-collapse-btn {
+    display: flex;
+    margin: 8px auto 0;
+}
+
+/* 图片展开按钮居中悬浮在底部 */
+.ce-img-expand-btn {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+}
+
+.ce-img-expand-btn:hover {
+    transform: translateX(-50%) scale(1.03);
+}
+
+.ce-expand-icon {
+    font-size: 10px;
+    transition: transform 0.2s;
+    line-height: 1;
+}
+
+/* ==================== 长图折叠 ==================== */
+.ce-img-wrap {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+}
+
+.ce-img-wrap.ce-img-folded {
+    max-height: var(--ce-img-fold-height, 240px);
+    overflow: hidden;
+    display: block;
+    transition: max-height 0.35s ease;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.ce-img-wrap.ce-img-folded::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+.ce-img-wrap.ce-img-unfolded {
+    max-height: none !important;
+    overflow: visible;
+}
+
+.ce-img-wrap.ce-img-folded::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.25));
+    pointer-events: none;
+    z-index: 1;
+}
+
+.ce-img-wrap.ce-img-unfolded::after {
+    display: none;
+}
+
+/* ==================== 响应式优化 ==================== */
+@media (max-width: 768px) {
+    .ce-expand-btn,
+    .ce-img-expand-btn,
+    .ce-collapse-btn {
+        padding: 4px 10px;
+        font-size: 11px;
+    }
+
+    .ce-line-num {
+        width: 2.5em;
+        min-width: 2.5em;
+        padding: 0 4px 0 8px;
+    }
+}

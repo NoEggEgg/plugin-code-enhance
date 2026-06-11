@@ -1,0 +1,84 @@
+apiVersion: v1alpha1
+kind: Setting
+metadata:
+  name: plugin-code-enhance-settings
+spec:
+  forms:
+    - group: basic
+      label: 基础设置
+      formSchema:
+        - $formkit: checkbox
+          name: enableCodeHighlight
+          label: 启用代码高亮
+          value: true
+          help: 使用 Highlight.js 为代码块添加语法高亮，若已安装 Shiki 插件则自动跳过
+
+        - $formkit: select
+          name: hljsTheme
+          label: 亮色高亮主题
+          value: "github.min.css"
+          options:
+            - value: "github.min.css"
+              label: "GitHub Light"
+            - value: "atom-one-light.min.css"
+              label: "Atom One Light"
+            - value: "solarized-light.min.css"
+              label: "Solarized Light"
+            - value: "vs.min.css"
+              label: "VS Light"
+            - value: "tomorrow.min.css"
+              label: "Tomorrow"
+            - value: "ascetic.min.css"
+              label: "Ascetic"
+            - value: "foundation.min.css"
+              label: "Foundation"
+          help: 亮色模式下使用的代码高亮配色主题
+
+        - $formkit: select
+          name: hljsDarkTheme
+          label: 暗色高亮主题
+          value: "github-dark.min.css"
+          options:
+            - value: "github-dark.min.css"
+              label: "GitHub Dark"
+            - value: "atom-one-dark.min.css"
+              label: "Atom One Dark"
+            - value: "vs2015.min.css"
+              label: "VS 2015 Dark"
+            - value: "monokai.min.css"
+              label: "Monokai"
+            - value: "solarized-dark.min.css"
+              label: "Solarized Dark"
+            - value: "obsidian.min.css"
+              label: "Obsidian"
+            - value: "dracula.min.css"
+              label: "Dracula"
+          help: 暗色模式下使用的代码高亮配色主题，标题栏配色将自动匹配所选主题
+
+        - $formkit: checkbox
+          name: enableCodeFold
+          label: 启用代码折叠
+          value: true
+          help: 超过指定行数的代码块将自动折叠
+
+        - $formkit: number
+          name: codeFoldLine
+          label: 代码折叠行数阈值
+          value: 20
+          min: 5
+          max: 200
+          help: 超过此行数的代码块将自动折叠，0 表示不折叠
+
+        - $formkit: checkbox
+          name: enableImgFold
+          label: 启用长图折叠
+          value: true
+          help: 超过指定高度的图片将自动折叠
+
+        - $formkit: number
+          name: imgFoldHeight
+          label: 图片折叠高度阈值（px）
+          value: 400
+          min: 100
+          max: 2000
+          help: 超过此高度（px）的图片将自动折叠，0 表示不折叠
