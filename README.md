@@ -2,6 +2,8 @@
 
 Halo 博客平台的代码增强插件，提供代码高亮、代码折叠、长图折叠、行号显示和标题栏等功能。
 
+我的博客：[代码增强插件 — PluginCodeEnhance发布](https://wuqishi.com/archives/halo-plugin-code-enhance-intro)
+
 ## ✨ 功能特性
 
 - **代码高亮**：基于 Highlight.js 11.11.1，支持 14 种高亮主题（7 个亮色 + 7 个暗色）
@@ -40,19 +42,20 @@ gradle build -x test
 
 插件安装后，可在 Halo 管理后台进行配置：
 
-| 配置项 | 说明 | 默认值 |
-|--------|------|--------|
-| `enableCodeHighlight` | 是否启用代码高亮 | `true` |
-| `hljsTheme` | 亮色主题 | `github.min.css` |
-| `hljsDarkTheme` | 暗色主题 | `github-dark.min.css` |
-| `enableCodeFold` | 是否启用代码折叠 | `true` |
-| `codeFoldLine` | 代码折叠阈值（行数） | `20` |
-| `enableImgFold` | 是否启用长图折叠 | `true` |
-| `imgFoldHeight` | 图片折叠阈值（像素） | `400` |
+| 配置项                  | 说明                 | 默认值                  |
+| :---------------------- | :------------------- | :---------------------- |
+| `enableCodeHighlight` | 是否启用代码高亮     | `true`                |
+| `hljsTheme`           | 亮色主题             | `github.min.css`      |
+| `hljsDarkTheme`       | 暗色主题             | `github-dark.min.css` |
+| `enableCodeFold`      | 是否启用代码折叠     | `true`                |
+| `codeFoldLine`        | 代码折叠阈值（行数） | `20`                  |
+| `enableImgFold`       | 是否启用长图折叠     | `true`                |
+| `imgFoldHeight`       | 图片折叠阈值（像素） | `400`                 |
 
 ## 🎨 支持的主题
 
 ### 亮色主题
+
 - GitHub Light
 - Atom One Light
 - Solarized Light
@@ -62,6 +65,7 @@ gradle build -x test
 - Foundation
 
 ### 暗色主题
+
 - GitHub Dark
 - Atom One Dark
 - VS 2015 Dark
@@ -74,7 +78,6 @@ gradle build -x test
 
 插件安装启用后，会自动对文章中的代码块和图片进行处理：
 
-```markdown
 ```java
 public class HelloWorld {
     public static void main(String[] args) {
@@ -82,9 +85,9 @@ public class HelloWorld {
     }
 }
 ```
-```
 
 代码块会自动显示：
+
 - 顶部标题栏（显示语言名称 "Java"）
 - 复制按钮（一键复制代码）
 - 折叠按钮（收起/展开代码块）
@@ -142,6 +145,7 @@ String script = PROPERTY_PLACEHOLDER_HELPER.replacePlaceholders(template, proper
 ### 前端实现
 
 前端采用模块化设计，包含以下核心模块：
+
 - **Config**：配置加载和管理
 - **Highlight**：代码高亮处理（支持 Shiki 检测）
 - **CodeDecor**：代码装饰（行号、标题栏、复制按钮）
@@ -151,13 +155,3 @@ String script = PROPERTY_PLACEHOLDER_HELPER.replacePlaceholders(template, proper
 ## 📄 许可证
 
 This project is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) file for details.
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 📧 联系方式
-
-如有问题或建议，欢迎通过以下方式联系：
-
-- 提交 [Issue](https://github.com/your-repo/plugin-code-enhance/issues)
