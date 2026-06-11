@@ -13,6 +13,8 @@ spec:
   configMapName: plugin-code-enhance-configMap
   displayName: "代码增强（高亮+折叠+长图折叠）"
   description: "集成 Highlight.js 代码高亮、代码块折叠和长图折叠功能等"
+  homepage: https://wuqishi.com
+  repo: https://github.com/NoEggEgg/plugin-code-enhance
   license:
     - name: "GPL-3.0"
       url: "https://opensource.org/licenses/GPL-3.0"
