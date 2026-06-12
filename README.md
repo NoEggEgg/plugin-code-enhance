@@ -8,7 +8,7 @@ Halo 博客平台的代码增强插件，提供代码高亮、代码折叠、长
 
 - **代码高亮**：基于 Highlight.js 11.11.1，支持 14 种高亮主题（7 个亮色 + 7 个暗色）
 - **代码折叠**：自动检测长代码块，超过指定行数自动折叠，支持展开/收起
-- **长图折叠**：自动折叠超过指定高度的图片，提升页面加载性能
+- **长图折叠**：自动折叠超过指定高度的图片，优化文章排版
 - **行号显示**：为代码块添加行号，方便代码引用
 - **标题栏**：代码块顶部显示语言标识、复制按钮和折叠按钮
 - **暗色模式**：支持 Halo 暗色主题切换，配色自动匹配
@@ -29,7 +29,7 @@ Halo 博客平台的代码增强插件，提供代码高亮、代码折叠、长
 
 ```bash
 # 克隆仓库
-git clone https://github.com/your-repo/plugin-code-enhance.git
+git clone https://github.com/NoEggEgg/plugin-code-enhance.git
 cd plugin-code-enhance
 
 # 构建插件
@@ -76,7 +76,9 @@ gradle build -x test
 
 ## 🚀 使用说明
 
-插件安装启用后，会自动对文章中的代码块和图片进行处理：
+插件安装启用后，会自动对文章和页面中的代码块和图片进行处理：
+
+> **适用范围**：当前仅支持文章（post）和页面（page）模板，Moments / Docsme 等插件页面暂不支持。
 
 ```java
 public class HelloWorld {
@@ -98,7 +100,7 @@ public class HelloWorld {
 
 - **Halo**：2.20.x
 - **Highlight.js**：11.11.1
-- **Java**：21
+- **Java**：17
 - **Gradle**：8.5
 
 ## 📁 项目结构
@@ -147,7 +149,7 @@ String script = PROPERTY_PLACEHOLDER_HELPER.replacePlaceholders(template, proper
 前端采用模块化设计，包含以下核心模块：
 
 - **Config**：配置加载和管理
-- **Highlight**：代码高亮处理（支持 Shiki 检测）
+- **Highlight**：代码高亮处理（自动检测 Shiki，避免冲突）
 - **CodeDecor**：代码装饰（行号、标题栏、复制按钮）
 - **CodeFold**：代码折叠逻辑
 - **ImgFold**：长图折叠逻辑
@@ -155,3 +157,8 @@ String script = PROPERTY_PLACEHOLDER_HELPER.replacePlaceholders(template, proper
 ## 📄 许可证
 
 This project is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) file for details.
+
+## 🔗 链接
+
+- **博客**：[https://wuqishi.com](https://wuqishi.com)
+- **源码仓库**：[https://github.com/NoEggEgg/plugin-code-enhance](https://github.com/NoEggEgg/plugin-code-enhance)
