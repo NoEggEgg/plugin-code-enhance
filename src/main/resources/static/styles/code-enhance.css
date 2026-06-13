@@ -302,10 +302,14 @@
     pointer-events: auto;
 }
 
-/* 展开状态：收起按钮在代码块底部居中 */
+/* 展开状态：收起按钮 sticky 固定在滚动容器底部 */
 .ce-collapse-btn {
+    position: sticky;
+    bottom: 10px;
+    z-index: 2;
     display: flex;
-    margin: 8px auto 0;
+    margin: 8px auto;
+    pointer-events: auto;
 }
 
 /* 图片展开按钮居中悬浮在底部 */

@@ -29,6 +29,7 @@
     };
 
     var Config = {
+        pluginName: 'CodeEnhance',
         enableHighlight: false,
         enableCodeFold: false,
         enableImgFold: false,
@@ -37,6 +38,19 @@
         hljsTheme: '',
         hljsDarkTheme: ''
     };
+
+    // 内容区域选择器常量（统一管理，便于扩展）
+    var CONTENT_SELECTORS = [
+        '.article-content',
+        '.post-content',
+        'article',
+        '.moment-content',     // Moments 页面
+        '.moments-wrapper',    // Moments 页面
+        '.dm-content__body',   // Docsme 页面
+        '.prose-content'       // Docsme 页面
+    ];
+    var CONTENT_SELECTOR_STR = CONTENT_SELECTORS.join(', ');
+    var IMG_SELECTORS_STR = CONTENT_SELECTORS.map(function(s) { return s + ' img'; }).join(', ');
 
     // 主题配色映射：标题栏背景、文字色、代码区背景、边框色
     var THEME_COLORS = {
@@ -63,6 +77,7 @@
             console.warn('[' + PLUGIN_NAME + '] Config not found');
             return false;
         }
+        Config.pluginName = window.CodeEnhanceConfig.pluginName || 'CodeEnhance';
         Config.enableHighlight = window.CodeEnhanceConfig.enableHighlight === true;
         Config.enableCodeFold = window.CodeEnhanceConfig.enableCodeFold === true;
         Config.enableImgFold = window.CodeEnhanceConfig.enableImgFold === true;
@@ -81,11 +96,9 @@
                window.matchMedia('(prefers-color-scheme: dark)').matches;
     }
 
-    // 获取当前主题对应的配色（接受可选的 isDark 参数避免重复调用）
-    function getCurrentThemeColors(isDark) {
-        if (isDark === undefined) {
-            isDark = isDarkMode();
-        }
+    // 获取当前主题对应的配色
+    function getCurrentThemeColors() {
+        var isDark = isDarkMode();
         var theme = isDark ? Config.hljsDarkTheme : Config.hljsTheme;
         var colors = THEME_COLORS[theme];
         if (!colors) {
@@ -100,7 +113,7 @@
     // 将主题配色注入 CSS 变量，并切换 hljs 主题样式表
     function applyThemeColors() {
         var isDark = isDarkMode();
-        var colors = getCurrentThemeColors(isDark);  // 传入避免重复调用
+        var colors = getCurrentThemeColors();
         if (!colors) return;
         var root = document.documentElement;
         root.style.setProperty('--ce-header-bg', colors.bg);
@@ -139,20 +152,89 @@
     }
 
     var Highlight = {
+        _hljsLoaded: false,
+        _loading: false,
+        
         init: function () {
             if (!Config.enableHighlight) return;
             if (Highlight.isShikiActive()) return;
-            if (typeof hljs === 'undefined') return;
+            
+            var codeBlocks = document.querySelectorAll('pre > code');
+            if (codeBlocks.length === 0) return;
+            
+            // 如果 hljs 已加载，直接高亮
+            if (typeof hljs !== 'undefined') {
+                Highlight._hljsLoaded = true;
+                Highlight.doHighlight();
+                return;
+            }
+            
+            // 如果正在加载中，等待加载完成
+            if (Highlight._loading) return;
+            
+            // 动态加载 highlight.js
+            Highlight._loading = true;
+            var script = document.createElement('script');
+            script.src = '/plugins/' + Config.pluginName + '/assets/static/js/highlight.min.js';
+            script.onload = function() {
+                Highlight._loading = false;
+                Highlight._hljsLoaded = true;
+                Highlight.doHighlight();
+            };
+            script.onerror = function() {
+                Highlight._loading = false;
+                console.warn('[' + PLUGIN_NAME + '] Failed to load highlight.js, code highlighting disabled');
+            };
+            document.head.appendChild(script);
+        },
+        
+        doHighlight: function () {
             document.querySelectorAll('code[data-highlighted="yes"]').forEach(function (el) {
                 el.removeAttribute('data-highlighted');
             });
-            try { hljs.highlightAll(); } catch (e) { /* 忽略 */ }
+            try { 
+                document.querySelectorAll('pre > code:not(.hljs)').forEach(function (codeEl) {
+                    // 使用已有的 getLanguage 函数获取语言
+                    var lang = codeEl.getAttribute('data-language') || 
+                              codeEl.className.match(/(?:language-|hljs\s+)(\w+)/)?.[1];
+                    
+                    // 获取纯文本内容（textContent 自动转义 HTML）
+                    var text = codeEl.textContent || codeEl.innerText;
+                    
+                    // 使用 textContent 设置回元素，确保内容被正确转义
+                    codeEl.textContent = text;
+                    
+                    // 使用 highlight.js 的 API 进行高亮
+                    var result;
+                    if (lang && hljs.getLanguage(lang)) {
+                        result = hljs.highlight(text, { language: lang, ignoreIllegals: true });
+                    } else {
+                        result = hljs.highlightAuto(text);
+                    }
+                    
+                    // 将高亮结果设置回元素
+                    codeEl.innerHTML = result.value;
+                    codeEl.classList.add('hljs');
+                    
+                    // 添加标记表示已处理
+                    codeEl.setAttribute('data-highlighted', 'yes');
+                });
+            } catch (e) { 
+                console.warn('[' + PLUGIN_NAME + '] Highlight failed:', e);
+            }
         },
+        
         isShikiActive: function () {
-            return !!(
-                document.querySelector('pre.shiki, code.shiki, pre[data-shiki]') ||
-                document.querySelector('pre > code[style*="color"]')
-            );
+            if (document.querySelector('pre.shiki, code.shiki, pre[data-shiki]')) {
+                return true;
+            }
+            // 检查是否有 pre > code 已标记为 shiki 处理过（避免误判）
+            var codeBlocks = document.querySelectorAll('pre > code');
+            for (var i = 0; i < codeBlocks.length; i++) {
+                var className = codeBlocks[i].className || '';
+                if (className.indexOf('shiki') !== -1) return true;
+            }
+            return false;
         }
     };
 
@@ -172,7 +254,7 @@
 
             // 确保 figure 包裹
             var figure = pre.parentElement;
-            if (!figure || figure.tagName !== 'FIGURE' || !figure.classList.contains('ce-fold-wrap')) {
+            if (!figure || figure.tagName !== 'FIGURE') {
                 var newFigure = document.createElement('figure');
                 newFigure.className = 'ce-fold-wrap';
                 pre.parentNode.insertBefore(newFigure, pre);
@@ -184,20 +266,31 @@
             if (!figure.querySelector('.ce-header')) {
                 var header = document.createElement('div');
                 header.className = 'ce-header';
-                header.innerHTML =
-                    '<span class="ce-header-dots">' +
-                        '<span class="ce-header-dot ce-header-dot--red"></span>' +
-                        '<span class="ce-header-dot ce-header-dot--yellow"></span>' +
-                        '<span class="ce-header-dot ce-header-dot--green"></span>' +
-                    '</span>' +
-                    '<span class="ce-header-lang">' + (lang || 'Code') + '</span>' +
-                    '<div class="ce-header-actions">' +
-                        '<button class="ce-header-fold" title="收起代码">' +
-                            '<span class="ce-header-fold-icon ce-header-fold-icon--unfold">&#x25BC;</span>' +
-                            '<span class="ce-header-fold-icon ce-header-fold-icon--fold">&#x25C0;</span>' +
-                        '</button>' +
-                        '<button class="ce-header-copy" title="复制代码">复制</button>' +
-                    '</div>';
+                
+                // 创建标题栏结构（安全方式，避免 XSS）
+                var dots = document.createElement('span');
+                dots.className = 'ce-header-dots';
+                dots.innerHTML = 
+                    '<span class="ce-header-dot ce-header-dot--red"></span>' +
+                    '<span class="ce-header-dot ce-header-dot--yellow"></span>' +
+                    '<span class="ce-header-dot ce-header-dot--green"></span>';
+                
+                var langSpan = document.createElement('span');
+                langSpan.className = 'ce-header-lang';
+                langSpan.textContent = lang || 'Code';  // 使用 textContent 避免 XSS
+                
+                var actions = document.createElement('div');
+                actions.className = 'ce-header-actions';
+                actions.innerHTML = 
+                    '<button class="ce-header-fold" title="收起代码">' +
+                        '<span class="ce-header-fold-icon ce-header-fold-icon--unfold">&#x25BC;</span>' +
+                        '<span class="ce-header-fold-icon ce-header-fold-icon--fold">&#x25C0;</span>' +
+                    '</button>' +
+                    '<button class="ce-header-copy" title="复制代码">复制</button>';
+                
+                header.appendChild(dots);
+                header.appendChild(langSpan);
+                header.appendChild(actions);
                 figure.insertBefore(header, pre);
 
                 // 复制按钮事件（支持触摸）
@@ -207,7 +300,7 @@
                     CodeDecor.copyCode(codeEl, copyBtn);
                 };
                 copyBtn.addEventListener('click', handleCopy);
-                copyBtn.addEventListener('touchstart', handleCopy);
+                copyBtn.addEventListener('touchstart', handleCopy, { passive: true });
 
                 // 标题栏折叠按钮事件（支持触摸）
                 var foldBtn = header.querySelector('.ce-header-fold');
@@ -216,7 +309,7 @@
                     CodeDecor.toggleFold(figure);
                 };
                 foldBtn.addEventListener('click', handleFold);
-                foldBtn.addEventListener('touchstart', handleFold);
+                foldBtn.addEventListener('touchstart', handleFold, { passive: true });
 
                 // 完全折叠后点击标题栏任意位置可展开（支持触摸）
                 var handleHeaderClick = function (e) {
@@ -225,7 +318,7 @@
                     }
                 };
                 header.addEventListener('click', handleHeaderClick);
-                header.addEventListener('touchstart', handleHeaderClick);
+                header.addEventListener('touchstart', handleHeaderClick, { passive: true });
             }
 
             // 添加行号
@@ -437,11 +530,6 @@
     };
 
     var ImgFold = {
-        init: function () {
-            // 保留旧方法兼容，实际使用 initImgObserver
-            initImgObserver();
-        },
-
         processImg: function (img) {
             if (img.closest('.ce-img-wrap')) return;
             if (img.src && img.src.endsWith('.svg')) return;
@@ -496,7 +584,7 @@
     };
 
     function init() {
-        var contentArea = document.querySelector('.article-content, .post-content, article');
+        var contentArea = document.querySelector(CONTENT_SELECTOR_STR);
         if (!contentArea) return;
         if (contentArea.getAttribute(INIT_FLAG) === 'true') return;
         contentArea.setAttribute(INIT_FLAG, 'true');
@@ -557,7 +645,7 @@
 
         if (!Config.enableImgFold || Config.imgFoldHeight <= 0) return;
 
-        var imgs = document.querySelectorAll('.article-content img, .post-content img, article img');
+        var imgs = document.querySelectorAll(IMG_SELECTORS_STR);
         if (imgs.length === 0) return;
 
         _imgObserver = new IntersectionObserver(function(entries) {

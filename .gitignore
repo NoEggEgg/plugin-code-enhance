@@ -8,7 +8,7 @@ build/
 *.zip
 *.tar.gz
 *.rar
-.gitignore
+
 
 # ==================== Gradle ====================
 .gradle/
@@ -21,12 +21,16 @@ gradle/wrapper/
 
 # ==================== 可选配置 ====================
 settings.gradle
+.gitignore
 
 # ==================== 测试代码（可选） ====================
 src/test/
 
 # ==================== 文档（可选） ====================
 DEVELOPMENT_GUIDE.md
+checklist.md
+tasks.md
+spec.md
 
 # ==================== IDE ====================
 .idea/

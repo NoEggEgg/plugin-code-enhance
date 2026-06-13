@@ -14,6 +14,7 @@ import run.halo.app.plugin.ReactiveSettingFetcher;
 import run.halo.app.theme.dialect.TemplateHeadProcessor;
 
 import java.util.Properties;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -35,7 +36,7 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
         }
 
         return reactiveSettingFetcher.fetch("basic", BasicConfig.class)
-            .defaultIfEmpty(BasicConfig.defaultConfig())
+            .defaultIfEmpty(new BasicConfig())
             .doOnNext(config -> {
                 if (!config.enableCodeHighlight && !config.enableCodeFold && !config.enableImgFold) {
                     log.debug("All features disabled, skip injection");
@@ -55,13 +56,13 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
 
                 String script = PROPERTY_PLACEHOLDER_HELPER.replacePlaceholders("""
                     <!-- PluginCodeEnhance start -->
-                    <link rel="stylesheet" href="/plugins/${name}/assets/static/styles/${hljsTheme}?v=${version}"/>
+                    <link rel="stylesheet" href="/plugins/${name}/assets/static/styles/${hljsTheme}?v=${version}" id="ce-hljs-light"/>
                     <link rel="stylesheet" href="/plugins/${name}/assets/static/styles/${hljsDarkTheme}?v=${version}" id="ce-hljs-dark" disabled="disabled"/>
-                    <script src="/plugins/${name}/assets/static/js/highlight.min.js?v=${version}"></script>
                     <link rel="stylesheet" href="/plugins/${name}/assets/static/styles/code-enhance.css?v=${version}"/>
                     <script src="/plugins/${name}/assets/static/js/code-enhance.js?v=${version}"></script>
                     <script>
                     window.CodeEnhanceConfig = {
+                        pluginName: "${name}",
                         enableHighlight: ${enableCodeHighlight},
                         enableCodeFold: ${enableCodeFold},
                         enableImgFold: ${enableImgFold},
@@ -85,9 +86,37 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
             .then();
     }
 
+    private static final Set<String> CONTENT_TEMPLATES = Set.of("post", "page", "moments", "doc");
+
     private boolean notContentTemplate(ITemplateContext context) {
         var templateId = context.getVariable("_templateId");
-        return !"post".equals(templateId) && !"page".equals(templateId);
+
+        // 1. 快速路径：白名单匹配，避免昂贵的 getVariable 调用
+        if (templateId != null && CONTENT_TEMPLATES.contains(templateId)) {
+            log.debug("CodeEnhance matched content template: {}", templateId);
+            return false;
+        }
+
+        // 2. 兜底：检测内容变量（支持 Moments/Docsme 等插件页面）
+        if (context.getVariable("post") != null) {
+            log.debug("CodeEnhance detected post variable");
+            return false;
+        }
+        if (context.getVariable("singlePage") != null) {
+            log.debug("CodeEnhance detected singlePage variable");
+            return false;
+        }
+        if (context.getVariable("docInfo") != null) {
+            log.debug("CodeEnhance detected docInfo variable (Docsme)");
+            return false;
+        }
+        if (context.getVariable("moments") != null) {
+            log.debug("CodeEnhance detected moments variable (Moments)");
+            return false;
+        }
+
+        log.debug("CodeEnhance skipping non-content template: {}", templateId);
+        return true;
     }
 
     @Data
@@ -99,9 +128,5 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
         private int imgFoldHeight = 400;
         private String hljsTheme = "github.min.css";
         private String hljsDarkTheme = "github-dark.min.css";
-
-        public static BasicConfig defaultConfig() {
-            return new BasicConfig();
-        }
     }
 }
