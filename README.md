@@ -80,6 +80,8 @@ gradle build -x test
 
 > **适用范围**：当前仅支持文章（post）和页面（page）模板，Moments / Docsme 等插件页面暂不支持。
 
+> V1.1.0 版本扩展模板匹配范围，支持 Moments 和 Docsme 插件页面
+
 ```java
 public class HelloWorld {
     public static void main(String[] args) {
@@ -153,6 +155,25 @@ String script = PROPERTY_PLACEHOLDER_HELPER.replacePlaceholders(template, proper
 - **CodeDecor**：代码装饰（行号、标题栏、复制按钮）
 - **CodeFold**：代码折叠逻辑
 - **ImgFold**：长图折叠逻辑
+
+## 版本更新
+
+### 
+
+
+### v1.1.0
+
+* 动态加载 highlight.min.js，仅在检测到代码* 块时引入资源
+- 扩展模板匹配范围，支持 Moments 和 Docsme 插件页面
+- 重构高亮逻辑，使用 hljs API 处理文本以防止 XSS
+- 移除静态脚本标签，改为前端按需加载
+- 优化触摸事件监听，添加 passive: true 提升滚动性能
+- 改进代码块标题栏 DOM 构建，确保语言文本安全插入
+- 调整折叠按钮样式为 sticky 定位
+
+### v1.0.0
+
+- 初始版本发布，支持代码高亮、折叠、长图折叠等功能
 
 ## 📄 许可证
 
