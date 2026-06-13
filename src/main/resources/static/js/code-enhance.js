@@ -11,6 +11,7 @@
     var _themeObserver = null;  // 保存 MutationObserver 引用以便清理
     var _codeObserver = null;   // 代码块 IntersectionObserver
     var _imgObserver = null;    // 图片 IntersectionObserver
+    var _observersPending = false; // highlight.js 异步加载时，观察者是否待启动
 
     // 语言名称映射
     var LANG_MAP = {
@@ -155,22 +156,25 @@
         _hljsLoaded: false,
         _loading: false,
         
+        /**
+         * @returns {boolean} true if async loading is pending (observers should wait)
+         */
         init: function () {
-            if (!Config.enableHighlight) return;
-            if (Highlight.isShikiActive()) return;
+            if (!Config.enableHighlight) return false;
+            if (Highlight.isShikiActive()) return false;
             
             var codeBlocks = document.querySelectorAll('pre > code');
-            if (codeBlocks.length === 0) return;
+            if (codeBlocks.length === 0) return false;
             
-            // 如果 hljs 已加载，直接高亮
+            // 如果 hljs 已加载，同步高亮
             if (typeof hljs !== 'undefined') {
                 Highlight._hljsLoaded = true;
                 Highlight.doHighlight();
-                return;
+                return false;
             }
             
             // 如果正在加载中，等待加载完成
-            if (Highlight._loading) return;
+            if (Highlight._loading) return true;
             
             // 动态加载 highlight.js
             Highlight._loading = true;
@@ -180,31 +184,38 @@
                 Highlight._loading = false;
                 Highlight._hljsLoaded = true;
                 Highlight.doHighlight();
+                // 高亮完成后启动延迟处理
+                if (_observersPending) {
+                    initCodeObserver();
+                    initImgObserver();
+                    _observersPending = false;
+                }
             };
             script.onerror = function() {
                 Highlight._loading = false;
+                _observersPending = false;  // 加载失败，不再等待
                 console.warn('[' + PLUGIN_NAME + '] Failed to load highlight.js, code highlighting disabled');
             };
             document.head.appendChild(script);
+            return true;  // 异步加载中，观察者需等待
         },
-        
+
         doHighlight: function () {
             document.querySelectorAll('code[data-highlighted="yes"]').forEach(function (el) {
                 el.removeAttribute('data-highlighted');
             });
             try { 
                 document.querySelectorAll('pre > code:not(.hljs)').forEach(function (codeEl) {
-                    // 使用已有的 getLanguage 函数获取语言
+                    // 提取纯文本（textContent 自动转义 HTML，安全）
+                    var text = codeEl.textContent || codeEl.innerText;
+                    
+                    // 用纯文本替换 innerHTML，清除潜在注入
+                    codeEl.textContent = text;
+                    
                     var lang = codeEl.getAttribute('data-language') || 
                               codeEl.className.match(/(?:language-|hljs\s+)(\w+)/)?.[1];
                     
-                    // 获取纯文本内容（textContent 自动转义 HTML）
-                    var text = codeEl.textContent || codeEl.innerText;
-                    
-                    // 使用 textContent 设置回元素，确保内容被正确转义
-                    codeEl.textContent = text;
-                    
-                    // 使用 highlight.js 的 API 进行高亮
+                    // 使用 highlight.js 安全高亮
                     var result;
                     if (lang && hljs.getLanguage(lang)) {
                         result = hljs.highlight(text, { language: lang, ignoreIllegals: true });
@@ -212,11 +223,9 @@
                         result = hljs.highlightAuto(text);
                     }
                     
-                    // 将高亮结果设置回元素
+                    // hljs 输出的 result.value 只包含安全的 <span> 标签
                     codeEl.innerHTML = result.value;
                     codeEl.classList.add('hljs');
-                    
-                    // 添加标记表示已处理
                     codeEl.setAttribute('data-highlighted', 'yes');
                 });
             } catch (e) { 
@@ -237,6 +246,11 @@
             return false;
         }
     };
+
+    function escapeHtml(text) {
+        var map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
 
     // 行号 + 标题栏
     var CodeDecor = {
@@ -333,16 +347,32 @@
         addLineNumbers: function (codeEl) {
             if (codeEl.querySelector('.ce-code-grid')) return;
 
-            var html = codeEl.innerHTML;
-            var lines = CodeDecor.splitLines(html);
+            var lines;
+            var hasHljs = codeEl.classList.contains('hljs');
+
+            if (hasHljs) {
+                // hljs 已处理，innerHTML 只含安全的 <span> 标签
+                var html = codeEl.innerHTML;
+                lines = CodeDecor.splitLines(html);
+            } else {
+                // 未高亮（highlight 未启用等），从 textContent 取纯文本
+                var text = codeEl.textContent || codeEl.innerText;
+                lines = text.split('\n');
+                // 移除末尾空行
+                if (lines.length > 0 && lines[lines.length - 1].trim() === '') {
+                    lines.pop();
+                }
+            }
+
             if (lines.length === 0) return;
 
             // 使用 Grid 布局，每行 2 个节点（行号 + 代码），比 table 少 33% DOM 节点
             var parts = ['<div class="ce-code-grid">'];
             for (var i = 0; i < lines.length; i++) {
+                var codeContent = hasHljs ? (lines[i] || ' ') : escapeHtml(lines[i] || ' ');
                 parts.push(
                     '<span class="ce-line-num">' + (i + 1) + '</span>' +
-                    '<span class="ce-line-code">' + (lines[i] || ' ') + '</span>'
+                    '<span class="ce-line-code">' + codeContent + '</span>'
                 );
             }
             parts.push('</div>');
@@ -591,12 +621,16 @@
 
         if (!loadConfig()) return;
         applyThemeColors();
-        Highlight.init();
-        
-        // 使用 IntersectionObserver 延迟处理代码块
+        var hlLoading = Highlight.init();
+
+        // highlight.js 异步加载中 → 观察者等待 onload 再启动
+        if (hlLoading) {
+            _observersPending = true;
+            return;
+        }
+
+        // 同步路径：直接启动观察者
         initCodeObserver();
-        
-        // 使用 IntersectionObserver 延迟处理图片
         initImgObserver();
     }
 

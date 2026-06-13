@@ -35,7 +35,7 @@ cd plugin-code-enhance
 # 构建插件
 gradle build -x test
 
-# 构建产物位于 build/libs/plugin-code-enhance-1.0.0.jar
+# 构建产物位于 build/libs/plugin-code-enhance-1.1.1.jar
 ```
 
 ## ⚙️ 配置选项
@@ -161,9 +161,16 @@ String script = PROPERTY_PLACEHOLDER_HELPER.replacePlaceholders(template, proper
 ### 
 
 
+### v1.1.1
+
+- 强化 XSS 防护：hljs 高亮流程使用 `textContent` 提取代码，未高亮场景下行号使用 `escapeHtml()` 转义
+- 修复异步竞态：`Highlight.init()` 异步加载时延迟启动 `IntersectionObserver`，避免 `doHighlight` 清空已装饰的行号
+- 代码审查优化：`notContentTemplate` 检查顺序调优，删除冗余方法，预计算选择器字符串
+- 测试增强：新增 5 个测试用例，覆盖默认值、插件变量兜底路径、注入内容断言
+
 ### v1.1.0
 
-* 动态加载 highlight.min.js，仅在检测到代码* 块时引入资源
+* 动态加载 highlight.min.js，仅在检测到代码块时引入资源
 - 扩展模板匹配范围，支持 Moments 和 Docsme 插件页面
 - 重构高亮逻辑，使用 hljs API 处理文本以防止 XSS
 - 移除静态脚本标签，改为前端按需加载
