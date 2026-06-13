@@ -58,8 +58,8 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
                     <!-- PluginCodeEnhance start -->
                     <link rel="stylesheet" href="/plugins/${name}/assets/static/styles/${hljsTheme}?v=${version}" id="ce-hljs-light"/>
                     <link rel="stylesheet" href="/plugins/${name}/assets/static/styles/${hljsDarkTheme}?v=${version}" id="ce-hljs-dark" disabled="disabled"/>
-                    <link rel="stylesheet" href="/plugins/${name}/assets/static/styles/code-enhance.css?v=${version}"/>
-                    <script src="/plugins/${name}/assets/static/js/code-enhance.js?v=${version}"></script>
+                    <link rel="stylesheet" href="/plugins/${name}/assets/static/styles/code-enhance.min.css?v=${version}"/>
+                    <script src="/plugins/${name}/assets/static/js/code-enhance.min.js?v=${version}"></script>
                     <script>
                     window.CodeEnhanceConfig = {
                         pluginName: "${name}",

@@ -158,7 +158,10 @@ String script = PROPERTY_PLACEHOLDER_HELPER.replacePlaceholders(template, proper
 
 ## 版本更新
 
-### 
+### v1.1.2
+
+- 更新静态资源引用为压缩版本 (code-enhance.min.css/js)
+- 删除未压缩的源文件 (code-enhance.css/js)
 
 
 ### v1.1.1
