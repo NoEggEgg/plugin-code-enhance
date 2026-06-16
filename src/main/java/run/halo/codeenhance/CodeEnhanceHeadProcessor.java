@@ -16,6 +16,10 @@ import run.halo.app.theme.dialect.TemplateHeadProcessor;
 import java.util.Properties;
 import java.util.Set;
 
+/**
+ * 代码增强插件的页面头部处理器
+ * 负责根据配置条件化注入代码高亮、代码折叠和图片折叠功能所需的资源
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -23,6 +27,46 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
 
     static final PropertyPlaceholderHelper PROPERTY_PLACEHOLDER_HELPER =
         new PropertyPlaceholderHelper("${", "}");
+
+    private static final Set<String> CONTENT_TEMPLATES = Set.of("post", "page", "moments", "doc");
+    
+    private static final String HLJS_CSS_TEMPLATE = """
+        <link rel="stylesheet" href="/plugins/${name}/assets/static/styles/${hljsTheme}?v=${version}" id="ce-hljs-light"/>
+        <link rel="stylesheet" href="/plugins/${name}/assets/static/styles/${hljsDarkTheme}?v=${version}" id="ce-hljs-dark" disabled="disabled"/>
+        """;
+    
+    private static final String BASE_RESOURCES_TEMPLATE = """
+        <link rel="stylesheet" href="/plugins/${name}/assets/static/styles/code-enhance.min.css?v=${version}"/>
+        <script src="/plugins/${name}/assets/static/js/code-enhance.js?v=${version}"></script>
+        """;
+    
+    private static final String CONFIG_WITH_THEME_TEMPLATE = """
+        <script>
+        window.CodeEnhanceConfig = {
+            pluginName: "${name}",
+            enableHighlight: ${enableHighlight},
+            enableCodeFold: ${enableCodeFold},
+            enableImgFold: ${enableImgFold},
+            codeFoldLine: ${codeFoldLine},
+            imgFoldHeight: ${imgFoldHeight},
+            hljsTheme: "${hljsTheme}",
+            hljsDarkTheme: "${hljsDarkTheme}"
+        };
+        </script>
+        """;
+    
+    private static final String CONFIG_WITHOUT_THEME_TEMPLATE = """
+        <script>
+        window.CodeEnhanceConfig = {
+            pluginName: "${name}",
+            enableHighlight: ${enableHighlight},
+            enableCodeFold: ${enableCodeFold},
+            enableImgFold: ${enableImgFold},
+            codeFoldLine: ${codeFoldLine},
+            imgFoldHeight: ${imgFoldHeight}
+        };
+        </script>
+        """;
 
     private final ReactiveSettingFetcher reactiveSettingFetcher;
     private final PluginContext pluginContext;
@@ -38,95 +82,94 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
         return reactiveSettingFetcher.fetch("basic", BasicConfig.class)
             .defaultIfEmpty(new BasicConfig())
             .doOnNext(config -> {
-                if (!config.enableCodeHighlight && !config.enableCodeFold && !config.enableImgFold) {
+                if (!config.hasAnyFeatureEnabled()) {
                     log.debug("All features disabled, skip injection");
                     return;
                 }
                 
-                final Properties properties = new Properties();
-                properties.setProperty("name", pluginContext.getName());
-                properties.setProperty("version", pluginContext.getVersion());
-                properties.setProperty("enableCodeHighlight", String.valueOf(config.enableCodeHighlight));
-                properties.setProperty("enableCodeFold", String.valueOf(config.enableCodeFold));
-                properties.setProperty("enableImgFold", String.valueOf(config.enableImgFold));
-                properties.setProperty("codeFoldLine", String.valueOf(config.codeFoldLine));
-                properties.setProperty("imgFoldHeight", String.valueOf(config.imgFoldHeight));
-                properties.setProperty("hljsTheme", config.hljsTheme);
-                properties.setProperty("hljsDarkTheme", config.hljsDarkTheme);
-
-                String script = PROPERTY_PLACEHOLDER_HELPER.replacePlaceholders("""
-                    <!-- PluginCodeEnhance start -->
-                    <link rel="stylesheet" href="/plugins/${name}/assets/static/styles/${hljsTheme}?v=${version}" id="ce-hljs-light"/>
-                    <link rel="stylesheet" href="/plugins/${name}/assets/static/styles/${hljsDarkTheme}?v=${version}" id="ce-hljs-dark" disabled="disabled"/>
-                    <link rel="stylesheet" href="/plugins/${name}/assets/static/styles/code-enhance.min.css?v=${version}"/>
-                    <script src="/plugins/${name}/assets/static/js/code-enhance.min.js?v=${version}"></script>
-                    <script>
-                    window.CodeEnhanceConfig = {
-                        pluginName: "${name}",
-                        enableHighlight: ${enableCodeHighlight},
-                        enableCodeFold: ${enableCodeFold},
-                        enableImgFold: ${enableImgFold},
-                        codeFoldLine: ${codeFoldLine},
-                        imgFoldHeight: ${imgFoldHeight},
-                        hljsTheme: "${hljsTheme}",
-                        hljsDarkTheme: "${hljsDarkTheme}"
-                    };
-                    </script>
-                    <!-- PluginCodeEnhance end -->
-                    """, properties);
-
-                model.add(context.getModelFactory().createText(script));
-                log.debug("CodeEnhance script injected for template: {}",
-                        context.getVariable("_templateId"));
+                injectResources(context, model, config);
             })
             .onErrorResume(e -> {
-                log.error("CodeEnhanceHeadProcessor process failed: {}", e.getMessage());
+                log.error("CodeEnhanceHeadProcessor process failed", e);
                 return Mono.empty();
             })
             .then();
     }
 
-    private static final Set<String> CONTENT_TEMPLATES = Set.of("post", "page", "moments", "doc");
+    private void injectResources(ITemplateContext context, IModel model, BasicConfig config) {
+        Properties properties = buildProperties(config);
+        
+        StringBuilder builder = new StringBuilder();
+        builder.append("\n<!-- PluginCodeEnhance start -->\n");
+        
+        if (config.enableHighlight) {
+            appendHljsResources(builder, properties);
+        }
+        appendConfig(builder, properties, config.enableHighlight);
+        appendBaseResources(builder, properties);
+        
+        builder.append("<!-- PluginCodeEnhance end -->\n");
+        model.add(context.getModelFactory().createText(builder.toString()));
+        
+        log.debug("CodeEnhance script injected: highlight={}, codeFold={}, imgFold={}",
+                config.enableHighlight, config.enableCodeFold, config.enableImgFold);
+    }
+
+    private Properties buildProperties(BasicConfig config) {
+        Properties properties = new Properties();
+        properties.setProperty("name", pluginContext.getName());
+        properties.setProperty("version", pluginContext.getVersion());
+        properties.setProperty("enableHighlight", String.valueOf(config.enableHighlight));
+        properties.setProperty("enableCodeFold", String.valueOf(config.enableCodeFold));
+        properties.setProperty("enableImgFold", String.valueOf(config.enableImgFold));
+        properties.setProperty("codeFoldLine", String.valueOf(config.codeFoldLine));
+        properties.setProperty("imgFoldHeight", String.valueOf(config.imgFoldHeight));
+        properties.setProperty("hljsTheme", config.hljsTheme);
+        properties.setProperty("hljsDarkTheme", config.hljsDarkTheme);
+        return properties;
+    }
+
+    private void appendHljsResources(StringBuilder builder, Properties properties) {
+        builder.append(PROPERTY_PLACEHOLDER_HELPER.replacePlaceholders(HLJS_CSS_TEMPLATE, properties));
+    }
+
+    private void appendConfig(StringBuilder builder, Properties properties, boolean withTheme) {
+        String template = withTheme ? CONFIG_WITH_THEME_TEMPLATE : CONFIG_WITHOUT_THEME_TEMPLATE;
+        builder.append(PROPERTY_PLACEHOLDER_HELPER.replacePlaceholders(template, properties));
+    }
+
+    private void appendBaseResources(StringBuilder builder, Properties properties) {
+        builder.append(PROPERTY_PLACEHOLDER_HELPER.replacePlaceholders(BASE_RESOURCES_TEMPLATE, properties));
+    }
 
     private boolean notContentTemplate(ITemplateContext context) {
         var templateId = context.getVariable("_templateId");
-
-        // 1. 快速路径：白名单匹配，避免昂贵的 getVariable 调用
         if (templateId != null && CONTENT_TEMPLATES.contains(templateId)) {
             log.debug("CodeEnhance matched content template: {}", templateId);
             return false;
         }
+        return !hasContentVariable(context);
+    }
 
-        // 2. 兜底：检测内容变量（支持 Moments/Docsme 等插件页面）
-        if (context.getVariable("post") != null) {
-            log.debug("CodeEnhance detected post variable");
-            return false;
-        }
-        if (context.getVariable("singlePage") != null) {
-            log.debug("CodeEnhance detected singlePage variable");
-            return false;
-        }
-        if (context.getVariable("docInfo") != null) {
-            log.debug("CodeEnhance detected docInfo variable (Docsme)");
-            return false;
-        }
-        if (context.getVariable("moments") != null) {
-            log.debug("CodeEnhance detected moments variable (Moments)");
-            return false;
-        }
-
-        log.debug("CodeEnhance skipping non-content template: {}", templateId);
-        return true;
+    private boolean hasContentVariable(ITemplateContext context) {
+        return context.getVariable("post") != null 
+            || context.getVariable("singlePage") != null 
+            || context.getVariable("docInfo") != null 
+            || context.getVariable("moments") != null;
     }
 
     @Data
     public static class BasicConfig {
-        private boolean enableCodeHighlight = true;
+        private boolean enableHighlight = true;
         private boolean enableCodeFold = true;
         private boolean enableImgFold = true;
         private int codeFoldLine = 20;
         private int imgFoldHeight = 400;
         private String hljsTheme = "github.min.css";
         private String hljsDarkTheme = "github-dark.min.css";
+
+        public boolean hasAnyFeatureEnabled() {
+            return enableHighlight || enableCodeFold || enableImgFold;
+        }
     }
 }
