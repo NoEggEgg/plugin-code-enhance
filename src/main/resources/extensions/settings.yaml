@@ -10,12 +10,12 @@ spec:
         - $formkit: checkbox
           name: enableHighlight
           label: 启用代码高亮
-          value: true
+          value: false
           help: 使用 Highlight.js 为代码块添加语法高亮，若已安装 Shiki 插件则自动跳过
 
         - $formkit: select
           name: hljsTheme
-          label: 亮色高亮主题
+          label: 亮色模式高亮主题
           value: "github.min.css"
           options:
             - value: "github.min.css"
@@ -32,13 +32,6 @@ spec:
               label: "Ascetic"
             - value: "foundation.min.css"
               label: "Foundation"
-          help: 亮色模式下使用的代码高亮配色主题
-
-        - $formkit: select
-          name: hljsDarkTheme
-          label: 暗色高亮主题
-          value: "github-dark.min.css"
-          options:
             - value: "github-dark.min.css"
               label: "GitHub Dark"
             - value: "atom-one-dark.min.css"
@@ -53,12 +46,47 @@ spec:
               label: "Obsidian"
             - value: "dracula.min.css"
               label: "Dracula"
-          help: 暗色模式下使用的代码高亮配色主题，标题栏配色将自动匹配所选主题
+          help: 亮色模式下使用的代码高亮主题，也可选择深色主题实现反向配色
+
+        - $formkit: select
+          name: hljsDarkTheme
+          label: 暗色模式高亮主题
+          value: "github-dark.min.css"
+          options:
+            - value: "github.min.css"
+              label: "GitHub Light"
+            - value: "atom-one-light.min.css"
+              label: "Atom One Light"
+            - value: "solarized-light.min.css"
+              label: "Solarized Light"
+            - value: "vs.min.css"
+              label: "VS Light"
+            - value: "tomorrow.min.css"
+              label: "Tomorrow"
+            - value: "ascetic.min.css"
+              label: "Ascetic"
+            - value: "foundation.min.css"
+              label: "Foundation"
+            - value: "github-dark.min.css"
+              label: "GitHub Dark"
+            - value: "atom-one-dark.min.css"
+              label: "Atom One Dark"
+            - value: "vs2015.min.css"
+              label: "VS 2015 Dark"
+            - value: "monokai.min.css"
+              label: "Monokai"
+            - value: "solarized-dark.min.css"
+              label: "Solarized Dark"
+            - value: "obsidian.min.css"
+              label: "Obsidian"
+            - value: "dracula.min.css"
+              label: "Dracula"
+          help: 暗色模式下使用的代码高亮主题，也可选择亮色主题实现反向配色
 
         - $formkit: checkbox
           name: enableCodeFold
           label: 启用代码折叠
-          value: true
+          value: false
           help: 超过指定行数的代码块将自动折叠
 
         - $formkit: number
@@ -72,7 +100,7 @@ spec:
         - $formkit: checkbox
           name: enableImgFold
           label: 启用长图折叠
-          value: true
+          value: false
           help: 超过指定高度的图片将自动折叠
 
         - $formkit: number

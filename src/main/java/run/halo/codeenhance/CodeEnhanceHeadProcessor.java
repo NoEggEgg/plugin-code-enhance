@@ -29,18 +29,19 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
         new PropertyPlaceholderHelper("${", "}");
 
     private static final Set<String> CONTENT_TEMPLATES = Set.of("post", "page", "moments", "doc");
-    
+
     private static final String HLJS_CSS_TEMPLATE = """
         <link rel="stylesheet" href="/plugins/${name}/assets/static/styles/${hljsTheme}?v=${version}" id="ce-hljs-light"/>
         <link rel="stylesheet" href="/plugins/${name}/assets/static/styles/${hljsDarkTheme}?v=${version}" id="ce-hljs-dark" disabled="disabled"/>
         """;
-    
+
     private static final String BASE_RESOURCES_TEMPLATE = """
-        <link rel="stylesheet" href="/plugins/${name}/assets/static/styles/code-enhance.min.css?v=${version}"/>
+        <link rel="stylesheet" href="/plugins/${name}/assets/static/styles/code-enhance.css?v=${version}"/>
         <script src="/plugins/${name}/assets/static/js/code-enhance.js?v=${version}"></script>
         """;
-    
-    private static final String CONFIG_WITH_THEME_TEMPLATE = """
+
+    // 单一配置模板：通过 ${themePart} 动态注入主题字段，避免维护两份模板
+    private static final String CONFIG_TEMPLATE = """
         <script>
         window.CodeEnhanceConfig = {
             pluginName: "${name}",
@@ -48,22 +49,7 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
             enableCodeFold: ${enableCodeFold},
             enableImgFold: ${enableImgFold},
             codeFoldLine: ${codeFoldLine},
-            imgFoldHeight: ${imgFoldHeight},
-            hljsTheme: "${hljsTheme}",
-            hljsDarkTheme: "${hljsDarkTheme}"
-        };
-        </script>
-        """;
-    
-    private static final String CONFIG_WITHOUT_THEME_TEMPLATE = """
-        <script>
-        window.CodeEnhanceConfig = {
-            pluginName: "${name}",
-            enableHighlight: ${enableHighlight},
-            enableCodeFold: ${enableCodeFold},
-            enableImgFold: ${enableImgFold},
-            codeFoldLine: ${codeFoldLine},
-            imgFoldHeight: ${imgFoldHeight}
+            imgFoldHeight: ${imgFoldHeight}${themePart}
         };
         </script>
         """;
@@ -98,19 +84,19 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
 
     private void injectResources(ITemplateContext context, IModel model, BasicConfig config) {
         Properties properties = buildProperties(config);
-        
+
         StringBuilder builder = new StringBuilder();
         builder.append("\n<!-- PluginCodeEnhance start -->\n");
-        
+
         if (config.enableHighlight) {
-            appendHljsResources(builder, properties);
+            appendTemplate(builder, HLJS_CSS_TEMPLATE, properties);
         }
-        appendConfig(builder, properties, config.enableHighlight);
-        appendBaseResources(builder, properties);
-        
+        appendTemplate(builder, CONFIG_TEMPLATE, properties);
+        appendTemplate(builder, BASE_RESOURCES_TEMPLATE, properties);
+
         builder.append("<!-- PluginCodeEnhance end -->\n");
         model.add(context.getModelFactory().createText(builder.toString()));
-        
+
         log.debug("CodeEnhance script injected: highlight={}, codeFold={}, imgFold={}",
                 config.enableHighlight, config.enableCodeFold, config.enableImgFold);
     }
@@ -124,22 +110,32 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
         properties.setProperty("enableImgFold", String.valueOf(config.enableImgFold));
         properties.setProperty("codeFoldLine", String.valueOf(config.codeFoldLine));
         properties.setProperty("imgFoldHeight", String.valueOf(config.imgFoldHeight));
+        // 主题字段始终设置，仅在高亮启用时被 HLJS_CSS_TEMPLATE 使用
         properties.setProperty("hljsTheme", config.hljsTheme);
         properties.setProperty("hljsDarkTheme", config.hljsDarkTheme);
+        // 配置脚本中的主题片段：仅启用高亮时非空，避免开关耦合
+        properties.setProperty("themePart", buildThemePart(config));
         return properties;
     }
 
-    private void appendHljsResources(StringBuilder builder, Properties properties) {
-        builder.append(PROPERTY_PLACEHOLDER_HELPER.replacePlaceholders(HLJS_CSS_TEMPLATE, properties));
+    /**
+     * 构建主题字段片段：启用高亮时返回 ", hljsTheme: "...", hljsDarkTheme: "...""
+     * 禁用时返回空字符串，确保配置中不出现主题相关字段
+     */
+    private String buildThemePart(BasicConfig config) {
+        if (!config.enableHighlight) {
+            return "";
+        }
+        return String.format(",%n            hljsTheme: \"%s\",%n            hljsDarkTheme: \"%s\"",
+            config.hljsTheme, config.hljsDarkTheme);
     }
 
-    private void appendConfig(StringBuilder builder, Properties properties, boolean withTheme) {
-        String template = withTheme ? CONFIG_WITH_THEME_TEMPLATE : CONFIG_WITHOUT_THEME_TEMPLATE;
+    /**
+     * 通用模板追加方法：使用占位符替换后追加到 builder
+     * 消除三个 appendXxx 方法的重复逻辑
+     */
+    private void appendTemplate(StringBuilder builder, String template, Properties properties) {
         builder.append(PROPERTY_PLACEHOLDER_HELPER.replacePlaceholders(template, properties));
-    }
-
-    private void appendBaseResources(StringBuilder builder, Properties properties) {
-        builder.append(PROPERTY_PLACEHOLDER_HELPER.replacePlaceholders(BASE_RESOURCES_TEMPLATE, properties));
     }
 
     private boolean notContentTemplate(ITemplateContext context) {
@@ -160,9 +156,11 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
 
     @Data
     public static class BasicConfig {
-        private boolean enableHighlight = true;
-        private boolean enableCodeFold = true;
-        private boolean enableImgFold = true;
+        // 默认全部禁用，仅当配置正确读取后才按用户配置启用
+        // 避免 defaultIfEmpty 场景下强制启用功能
+        private boolean enableHighlight = false;
+        private boolean enableCodeFold = false;
+        private boolean enableImgFold = false;
         private int codeFoldLine = 20;
         private int imgFoldHeight = 400;
         private String hljsTheme = "github.min.css";
