@@ -1,9 +1,0 @@
-apiVersion: plugin.halo.run/v1alpha1
-kind: ExtensionDefinition
-metadata:
-  name: code-enhance-head-extension
-spec:
-  extensionPointName: template-head-processor
-  className: run.halo.codeenhance.CodeEnhanceHeadProcessor
-  displayName: "CodeEnhance Head Extension"
-  description: "Inject CSS, Highlight.js, config and init script into page head for post/page only"

@@ -1,15 +1,16 @@
 plugins {
     id 'java'
-    id 'run.halo.plugin.devtools' version '0.0.7'
-    id 'io.freefair.lombok' version '8.11'
+    id 'run.halo.plugin.devtools' version '0.8.0'
+    id 'io.freefair.lombok' version '8.13.1'
 }
 
 group 'run.halo.codeenhance'
-version '1.1.6'
+version '2.0.0'
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
 }
 
 repositories {
@@ -20,17 +21,27 @@ repositories {
 }
 
 dependencies {
-    implementation platform('run.halo.tools.platform:plugin:2.20.20')
+    implementation platform('run.halo.tools.platform:plugin:2.25.0')
     compileOnly 'run.halo.app:api'
     testImplementation 'run.halo.app:api'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'io.projectreactor:reactor-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 test {
     useJUnitPlatform()
 }
 
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+    options.release = 21
+}
+
 halo {
-    version = '2.20.0'
+    version = '2.25'
+    superAdminUsername = 'admin'
+    superAdminPassword = 'admin'
+    port = 8090
+    externalUrl = 'http://localhost:8090'
 }

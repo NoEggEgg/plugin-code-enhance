@@ -1,5 +1,6 @@
 # ==================== 构建产物 ====================
 build/
+bin
 *.class
 *.jar
 *.war
@@ -8,6 +9,9 @@ build/
 *.zip
 *.tar.gz
 *.rar
+.workbuddy
+halo-server
+.playwright-cli
 
 
 # ==================== Gradle ====================
@@ -32,6 +36,8 @@ checklist.md
 tasks.md
 spec.md
 HALO_PLUGIN_DEVELOPMENT_GUIDE.md
+git-commit-message.md
+plugin-state-analysis.md
 
 # ==================== IDE ====================
 .idea/
@@ -42,7 +48,7 @@ HALO_PLUGIN_DEVELOPMENT_GUIDE.md
 .project
 .classpath
 .settings/
-
+.comate/
 # ==================== 操作系统 ====================
 .DS_Store
 Thumbs.db
