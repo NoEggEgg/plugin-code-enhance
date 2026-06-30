@@ -28,8 +28,8 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
     private static final Set<String> CTX = Set.of("post", "page", "moments", "doc");
 
     private static final String BASE = """
-        <link rel="stylesheet" href="/plugins/${name}/assets/static/styles/code-enhance.css?v=${version}"/>
-        <script defer src="/plugins/${name}/assets/static/js/code-enhance.js?v=${version}"></script>""";
+        <link rel="stylesheet" href="/plugins/${name}/assets/styles/code-enhance.css?v=${version}"/>
+        <script defer src="/plugins/${name}/assets/js/code-enhance.js?v=${version}"></script>""";
 
     private static final String CONFIG = """
         <script>
