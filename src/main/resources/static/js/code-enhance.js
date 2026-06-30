@@ -62,6 +62,9 @@
     return b;
   }
 
+  // 保存 IntersectionObserver 实例，pjax 切换时释放旧实例
+  var _observers = [];
+
   function scan(sel, cb) {
     var io = new IntersectionObserver(function (es) {
       es.forEach(function (e) {
@@ -71,7 +74,13 @@
         }
       });
     }, { rootMargin: '200px' });
+    _observers.push(io);
     document.querySelectorAll(sel).forEach(function (el) { io.observe(el); });
+  }
+
+  function disconnectObservers() {
+    _observers.forEach(function (io) { io.disconnect(); });
+    _observers = [];
   }
 
   // ====== 代码折叠 ======
@@ -260,6 +269,8 @@
 
   // 兼容 pjax 页面切换（Halo 默认主题使用 pjax）
   document.addEventListener('pjax:complete', function () {
+    // pjax 切换时释放旧 observer，避免重复注册占内存
+    disconnectObservers();
     document.documentElement.removeAttribute('data-ce-init');
     init();
   });

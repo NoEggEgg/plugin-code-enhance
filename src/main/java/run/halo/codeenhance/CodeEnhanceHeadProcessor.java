@@ -34,7 +34,6 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
     private static final String CONFIG = """
         <script>
         window.CodeEnhanceConfig = {
-            pluginName: "${name}",
             enableCodeFold: ${enableCodeFold},
             enableImgFold: ${enableImgFold},
             codeFoldLine: ${codeFoldLine},

@@ -41,27 +41,12 @@
   overflow: visible;
 }
 
-/* 代码块主体 */
+/* 代码块主体 — 只保留折叠必需的属性，不覆盖主题样式 */
 .ce-pre {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  outline: 0;
-  box-shadow: none;
   overflow: hidden;
   overflow-x: auto;
-  position: relative;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
   transition: max-height 0.35s ease;
-  line-height: 1.6;
-  border-radius: 0;
-  background: transparent;
   white-space: pre;
-}
-
-.ce-pre::-webkit-scrollbar {
-  display: none;
 }
 
 /* 折叠态：限制 pre 高度实现内容截断，允许横向滚动 */

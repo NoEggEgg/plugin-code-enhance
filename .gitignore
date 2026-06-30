@@ -49,6 +49,7 @@ plugin-state-analysis.md
 .classpath
 .settings/
 .comate/
+demo/
 # ==================== 操作系统 ====================
 .DS_Store
 Thumbs.db
