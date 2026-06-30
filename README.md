@@ -167,6 +167,7 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
 **🐛 修复：插件 CSS 不再覆盖主题代码块样式**
 
 - **修复 CSS 冲突**：移除了 `.ce-pre` 中多余的重置样式（`background: transparent`、`padding: 0`、`border: 0` 等），主题的代码块背景色、内边距、滚动条等样式完整保留
+- **修复静态资源 404**：重新创建被误删的 `reverseProxy.yaml`，修正资源路径去掉多余 `/static/` 层级，CSS/JS 文件恢复正常加载
 - **移除无用数据**：前端配置不再注入未使用的 `pluginName` 字段
 - **内存整洁**：pjax 切换时正确释放旧 IntersectionObserver 实例
 - **文档修正**：README 后端代码示例对齐实际实现
