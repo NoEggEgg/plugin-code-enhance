@@ -25,7 +25,7 @@ Halo 博客平台的代码折叠增强插件，专注提供**代码块折叠**�
 
 ### 方法一：手动安装
 
-1. 下载最新版本的插件 JAR 文件（`plugin-codeenhance-2.0.1.jar`）
+1. 下载最新版本的插件 JAR 文件（`plugin-codeenhance-2.0.2.jar`）
 2. 登录 Halo 管理后台
 3. 进入「插件管理」→「安装插件」
 4. 选择下载的 JAR 文件上传安装
@@ -41,7 +41,7 @@ cd plugin-code-enhance
 # 构建插件
 ./gradlew build -x test
 
-# 构建产物位于 build/libs/plugin-codeenhance-2.0.1.jar
+# 构建产物位于 build/libs/plugin-codeenhance-2.0.2.jar
 ```
 
 ---
@@ -161,6 +161,17 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
 ---
 
 ## 版本更新
+
+### v2.0.2 (2026-07-07)
+
+**🐛 修复：长图折叠功能多项缺陷**
+
+- **包裹容器居中**：长图折叠容器由 `inline-block` 改为 `display:block; margin:16px auto`，与主题图片保持一致居中，不再错位偏左
+- **折叠态渐变遮罩**：折叠时图片底部新增渐变遮罩，提示下方仍有内容
+- **sticky 失效降级**：新增 `stickyBlocked()` 检测祖先滚动容器，若主题设 `overflow` 非 visible 导致 `sticky` 失效，自动降级为 `absolute` 定位，保证展开按钮始终可达
+- **折叠判断与展开动画优化**：
+  - 折叠判定由图片原始像素高度（`naturalHeight`）改为**页面实际渲染高度**（`getBoundingClientRect`），修复窄列中图片被 CSS 缩放后仍被包裹、折叠态与原图无差异的问题
+  - 展开/折叠均使用具体 `max-height` 数值（折叠为阈值、展开为完整渲染高度），`max-height` 过渡双向生效，消除展开瞬间跳变；兼容 `prefers-reduced-motion`
 
 ### v2.0.1 (2026-06-30)
 
