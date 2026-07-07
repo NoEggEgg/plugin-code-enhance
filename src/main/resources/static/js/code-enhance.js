@@ -204,6 +204,25 @@
     }
   }
 
+  /**
+   * 检测 sticky 是否会被祖先滚动容器阻断
+   * 若任意祖先元素建立了滚动容器（overflow 非 visible/clip，常见于主题设置 overflow-x:hidden），
+   * sticky 定位将失效，此时需降级为 absolute 定位
+   */
+  function stickyBlocked(el) {
+    var p = el.parentElement;
+    while (p && p !== document.documentElement) {
+      var cs = getComputedStyle(p);
+      if ((cs.overflow !== 'visible' && cs.overflow !== 'clip') ||
+          (cs.overflowX !== 'visible' && cs.overflowX !== 'clip') ||
+          (cs.overflowY !== 'visible' && cs.overflowY !== 'clip')) {
+        return true;
+      }
+      p = p.parentElement;
+    }
+    return false;
+  }
+
   function processImage(img) {
     if (img.classList.contains('ce-img-done')) return;
 
@@ -218,7 +237,10 @@
 
     img.classList.add('ce-img-done');
 
-    if (img.naturalWidth < 100 || img.naturalHeight < config.imgFoldHeight) return;
+    // 以「页面渲染高度」而非原始像素高度判断是否折叠。
+    // 否则被 CSS 缩放后实际显示不足阈值却仍被包裹，折叠态会与原图一致（缺陷1）
+    var rect = img.getBoundingClientRect();
+    if (rect.width < 100 || rect.height < config.imgFoldHeight) return;
 
     // 跳过 SVG 图片（矢量图不适合折叠）
     if (img.src && (/\.svg(\?.*)?$/i.test(img.src) || /^data:image\/svg/i.test(img.src))) return;
@@ -228,16 +250,43 @@
     w.setAttribute('data-ce-img', 'folded');
     w.style.setProperty('--ce-img-h', config.imgFoldHeight + 'px');
 
+    // 缓存图片完整渲染高度，供展开时做平滑过渡（此时尚未裁剪，rect 为全高）
+    var fullH = rect.height;
+
     var p = img.parentElement;
     p.insertBefore(w, img);
     w.appendChild(img);
 
+    // 若祖先存在滚动容器，sticky 会失效，标记后降级为 absolute（缺陷5）
+    if (stickyBlocked(w)) w.classList.add('ce-no-sticky');
+
     var btn = createBtn('img', function (e) {
       var folded = w.getAttribute('data-ce-img') === 'folded';
-      var next = folded ? 'unfolded' : 'folded';
-      w.setAttribute('data-ce-img', next);
-      e.currentTarget.setAttribute('aria-expanded', folded ? 'true' : 'false');
-      e.currentTarget.setAttribute('aria-label', folded ? I18N.imgCollapse : I18N.imgExpand);
+      if (folded) {
+        w.setAttribute('data-ce-img', 'unfolded');
+        // 展开到完整高度（具体数值，保证过渡动画生效，缺陷4）
+        w.style.maxHeight = fullH + 'px';
+        // 展开过程中保持裁剪以实现平滑揭示；动画结束后再放开裁剪，
+        // 兼容窗口缩放等导致图片实际高度变化的场景
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          w.style.overflow = '';
+        } else {
+          w.style.overflow = 'hidden';
+          w.addEventListener('transitionend', function te(ev) {
+            if (ev.propertyName !== 'max-height') return;
+            w.style.overflow = '';
+            w.removeEventListener('transitionend', te);
+          });
+        }
+        e.currentTarget.setAttribute('aria-expanded', 'true');
+        e.currentTarget.setAttribute('aria-label', I18N.imgCollapse);
+      } else {
+        w.setAttribute('data-ce-img', 'folded');
+        // 清除行内 max-height，回退到 CSS 的固定阈值（同为具体数值，过渡生效）
+        w.style.maxHeight = '';
+        e.currentTarget.setAttribute('aria-expanded', 'false');
+        e.currentTarget.setAttribute('aria-label', I18N.imgExpand);
+      }
     });
     btn.setAttribute('aria-label', I18N.imgExpand);
     w.appendChild(btn);
