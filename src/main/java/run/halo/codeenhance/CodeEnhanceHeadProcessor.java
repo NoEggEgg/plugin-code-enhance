@@ -45,6 +45,7 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
     private final PluginContext ctx;
 
     @Override
+    @SuppressWarnings("null")
     public Mono<Void> process(ITemplateContext c, IModel m, IElementModelStructureHandler h) {
         if (!isContent(c)) return Mono.empty();
         return fetcher.fetch("basic", BasicConfig.class)
