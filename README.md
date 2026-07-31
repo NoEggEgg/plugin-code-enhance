@@ -16,7 +16,7 @@ Halo 博客平台的代码折叠增强插件，专注提供**代码块折叠**�
 - **暗色模式**：通过 CSS 变量自动适配 Halo 暗色主题
 - **无障碍支持**：完整的 ARIA 属性支持（`aria-label`、`aria-expanded`、`:focus-visible`）
 - **移动端适配**：按钮尺寸优化，触摸友好
-- **性能优化**：使用 `IntersectionObserver` 延迟初始化，文件大小仅 8KB（减少 97%）
+- **性能优化**：使用 `IntersectionObserver` 延迟初始化，无外部依赖，JS 约 23KB（相比 v1.x 移除高亮库后显著减小）
 - **pjax 兼容**：自动监听 `pjax:complete` 事件，支持 Halo 默认主题的 pjax 路由切换
 
 ---
@@ -25,7 +25,7 @@ Halo 博客平台的代码折叠增强插件，专注提供**代码块折叠**�
 
 ### 方法一：手动安装
 
-1. 下载最新版本的插件 JAR 文件（`plugin-codeenhance-2.0.2.jar`）
+1. 下载最新版本的插件 JAR 文件（`plugin-codeenhance-2.0.3.jar`）
 2. 登录 Halo 管理后台
 3. 进入「插件管理」→「安装插件」
 4. 选择下载的 JAR 文件上传安装
@@ -41,7 +41,7 @@ cd plugin-code-enhance
 # 构建插件
 ./gradlew build -x test
 
-# 构建产物位于 build/libs/plugin-codeenhance-2.0.2.jar
+# 构建产物位于 build/libs/plugin-codeenhance-2.0.3.jar
 ```
 
 ---
@@ -106,9 +106,9 @@ plugin-code-enhance/
 │   │   └── settings.yaml             # 设置表单定义
 │   ├── static/
 │   │   ├── js/
-│   │   │   └── code-enhance.js       # 前端核心逻辑（~270 行）
+│   │   │   └── code-enhance.js       # 前端核心逻辑（~586 行）
 │   │   └── styles/
-│   │       └── code-enhance.css      # 插件样式（~220 行）
+│   │       └── code-enhance.css      # 插件样式（~333 行）
 │   └── plugin.yaml                   # 插件元数据
 ├── .gitignore                        # Git 忽略规则
 ├── build.gradle                      # Gradle 配置
@@ -130,12 +130,18 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
     @Override
     public Mono<Void> process(ITemplateContext context, IModel model,
                               IElementModelStructureHandler handler) {
-        // 从配置读取启用的功能
-        // 只有折叠或长图折叠启用时才注入资源
         return fetcher.fetch("basic", BasicConfig.class)
             .defaultIfEmpty(new BasicConfig())
             .filter(BasicConfig::hasAny)
-            .doOnNext(cfg -> inject(context, model, cfg))
+            .doOnNext(cfg -> {
+                sanitizeConfig(cfg);          // 非法阈值回退默认值
+                inject(context, model, cfg);
+            })
+            .onErrorResume(e -> {
+                log.error("CodeEnhance inject failed, fallback to defaults", e);
+                injectFallback(context, model); // 配置获取失败时兜底注入默认配置
+                return Mono.empty();
+            })
             .then();
     }
 }
@@ -143,7 +149,7 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
 
 ### 前端实现
 
-前端采用简洁的单文件设计，核心逻辑约 270 行：
+前端采用简洁的单文件设计，核心逻辑约 586 行：
 
 - **配置读取**：从 `window.CodeEnhanceConfig` 读取用户配置
 - **懒加载观察**：使用 `IntersectionObserver` 延迟处理，提升性能
@@ -153,14 +159,27 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
 
 **关键优化**：
 
-- 无外部依赖（不依赖 hljs、jQuery 等），文件大小仅 8KB
+- 无外部依赖（不依赖 hljs、jQuery 等），JS 约 23KB
 - 使用 CSS 变量管理配色，自动适配暗色主题
-- 使用 `position: sticky` 实现展开态按钮固定
+- 分状态定位：折叠态 `absolute` 锚定容器底部中央，展开态 `sticky` 粘视口底部（被 `overflow` 阻断时以 `overflow:clip` 修复或降级 `absolute`，按钮永不脱离容器）
 - 完整 ARIA 支持，提升无障碍体验
 
 ---
 
 ## 版本更新
+
+### v2.0.3 (2026-07-31)
+
+**🎯 按钮定位重构 + 健壮性增强**
+
+- **分状态按钮定位**：
+  - 折叠态：按钮 `absolute` 锚定代码块/图片容器底部中央（`bottom: 12px`），位于截断处可见、不遮挡内容、随容器滚动
+  - 展开态：按钮 `sticky` 粘视口底部（`bottom: 8px`），长内容滚动时持续可见、随时可折叠；容器滚出视口按钮随容器消失，**绝不脱离容器独立显示**
+- **sticky 阻断修复**：`stickyBlocked()` 遍历祖先时排除 `body`/`html`（页面级 overflow 不阻断 sticky，避免误判降级）；图片在 fancybox 等容器的真实 `overflow:hidden` 阻断，用 `ensureSticky()` 以 `overflow:clip` 修复（视觉等价但不创建滚动容器），保存/还原原始 overflow，仅旧浏览器降级 absolute
+- **图片 SVG 判断抽取**：`isSvgImage()` 统一图片格式检测
+- **后端健壮性**：`sanitizeConfig()` 对非法阈值（<1）回退默认（代码 20 行/图片 400px）；`injectFallback()` 配置获取失败时兜底注入默认配置，不再静默不注入
+- **注入范围调整**：移除模板类型过滤（post/page/moments/doc），统一注入、由前端按需处理
+- **动效**：展开/折叠平滑 `max-height` 过渡（0.35s），兼容 `prefers-reduced-motion`
 
 ### v2.0.2 (2026-07-07)
 

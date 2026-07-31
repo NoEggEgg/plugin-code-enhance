@@ -7,16 +7,17 @@
   --ce-btn-bg-hover: rgba(0, 0, 0, 0.75);
 }
 
-/* 暗色主题：仅通过 data-theme 属性检测，避免 [class*="dark"] 宽泛匹配 */
-[data-theme="dark"] {
+/* 暗色主题：覆盖 Halo 多种暗色模式属性名 */
+[data-theme="dark"],
+[data-mode="dark"],
+[data-color-scheme="dark"] {
   --ce-border: rgba(255, 255, 255, 0.18);
 }
 
 /* ============================================================
    代码块折叠
-   - 折叠态：按钮 absolute 定位在容器底部
-   - 展开态：按钮 sticky 定位在视口底部
-   - 两种状态都水平居中（相对于 .ce-block 宽度中央）
+   - 折叠态/展开态按钮统一定位策略见下方「折叠按钮」节
+   - 容器裁剪用 overflow:clip（内容超出圆角边框时不溢出）
    ============================================================ */
 
 .ce-block {
@@ -27,35 +28,33 @@
   /* 默认不裁剪（兼容不支持 overflow:clip 的浏览器） */
   overflow: visible;
   max-width: 100%;
+  container-type: inline-size;
 }
 
 /* 渐进增强：支持 overflow:clip 的浏览器才应用 */
 @supports (overflow: clip) {
-  .ce-block {
+  .ce-block,
+  .ce-adorn {
     overflow: clip;
   }
 }
 
-/* 展开态移除裁剪，让 sticky 按钮完全可见 */
-.ce-block[data-ce-state="expanded"] {
-  overflow: visible;
-}
-
 /* 代码块主体 — 只保留折叠必需的属性，不覆盖主题样式 */
-.ce-pre {
+/* 使用 .ce-block 前缀提高特异性，避免被主题的 [class*="language-"] 等通用选择器覆盖 */
+.ce-block .ce-pre {
   overflow: hidden;
   overflow-x: auto;
   transition: max-height 0.35s ease;
-  white-space: pre;
+  white-space: pre !important;
 }
 
-/* 折叠态：限制 pre 高度实现内容截断，允许横向滚动 */
+/* 折叠态：限制 pre 高度实现内容截断（横向滚动继承基础规则的 overflow-x:auto） */
 .ce-block[data-ce-state="collapsed"] .ce-pre {
   max-height: var(--ce-fold-h, 320px);
-  overflow-x: auto;
 }
 
-/* 展开态：pre 高度自然撑开，允许横向滚动 */
+/* 展开态：pre 高度自然撑开，允许横向滚动
+   （overflow:visible 是简写会把 x 轴也变 visible，必须显式补 overflow-x:auto 保留横向滚动） */
 .ce-block[data-ce-state="expanded"] .ce-pre {
   max-height: none;
   overflow: visible;
@@ -70,36 +69,47 @@
 .ce-img-wrap {
   position: relative;
   display: block;
-  margin: 16px auto;
+  width: 100%;
   max-width: 100%;
+  margin: 16px auto;
   transition: max-height 0.35s ease;
+  container-type: inline-size;
+}
+
+/* 强制让 .ce-img-wrap 的直接父容器变 block：
+   修复 Dream2 Plus 等主题的 [data-fancybox] 父容器是
+   display:inline-block + width:0 导致图片塌缩到 0 尺寸的问题。
+   :has() 是现代 CSS 选择器（Chrome 105+ / Safari 15.4+ / Firefox 121+） */
+:has(> .ce-img-wrap) {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* 渐进增强：支持 interpolate-size 的浏览器可用 max-content 实现原生展开动画 */
+@supports (interpolate-size: allow-keywords) {
+  .ce-img-wrap { interpolate-size: allow-keywords; }
+  .ce-img-wrap[data-ce-img="unfolded"] { max-height: max-content; }
 }
 
 .ce-img-wrap img {
   display: block;
+  width: 100%;
   max-width: 100%;
   margin: 0 auto;
 }
 
+/* 折叠态：裁剪图片超出部分（clip 不创建滚动容器，对按钮定位无影响） */
 .ce-img-wrap[data-ce-img="folded"] {
   max-height: var(--ce-img-h, 400px);
-  overflow: hidden;
+  overflow: clip;
+}
+@supports not (overflow: clip) {
+  .ce-img-wrap[data-ce-img="folded"] { overflow: hidden; }
 }
 
 .ce-img-wrap[data-ce-img="unfolded"] {
   overflow: visible;
-}
-
-/* 折叠态底部渐变遮罩：提示下方仍有内容（缺陷3） */
-.ce-img-wrap[data-ce-img="folded"]::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 72px;
-  pointer-events: none;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.35));
 }
 
 /* ============================================================
@@ -107,7 +117,8 @@
    ============================================================ */
 
 .ce-block .ce-fold-btn,
-.ce-img-wrap .ce-img-btn {
+.ce-img-wrap .ce-img-btn,
+.ce-adorn .ce-fold-btn {
   z-index: 2;
   display: flex;
   align-items: center;
@@ -129,75 +140,105 @@
 /* 渐进增强：支持 backdrop-filter 的浏览器才应用模糊效果 */
 @supports (backdrop-filter: blur(4px)) or (-webkit-backdrop-filter: blur(4px)) {
   .ce-block .ce-fold-btn,
-  .ce-img-wrap .ce-img-btn {
+  .ce-img-wrap .ce-img-btn,
+  .ce-adorn .ce-fold-btn {
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
   }
 }
 
 .ce-block .ce-fold-btn:hover,
-.ce-img-wrap .ce-img-btn:hover {
+.ce-img-wrap .ce-img-btn:hover,
+.ce-adorn .ce-fold-btn:hover {
   background: var(--ce-btn-bg-hover);
 }
 
 /* ============================================================
-   折叠态：absolute 定位在容器底部，水平居中
+   折叠按钮：分状态定位
+   - 折叠态：absolute 锚定容器底部中央（截断处可见，不浮动）
+   - 展开态：sticky 容器底部（容器高时粘视口底部供随时折叠，
+            容器滚出视口按钮消失——按钮仍在容器锚定内）
+   - 每个容器独立按钮
    ============================================================ */
 
+/* 折叠态按钮：锚定容器底部中央（截断处可见） */
 .ce-block[data-ce-state="collapsed"] .ce-fold-btn,
-.ce-img-wrap[data-ce-img="folded"] .ce-img-btn {
+.ce-img-wrap[data-ce-img="folded"] .ce-img-btn,
+.ce-adorn[data-ce-state="collapsed"] .ce-fold-btn {
   position: absolute;
-  bottom: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  animation: ce-pop-in 0.2s ease;
-}
-
-/* ============================================================
-   展开态：sticky 定位在视口底部，水平居中
-   使用 margin:auto 居中（比 left:50%+transform 更稳定）
-   ============================================================ */
-
-.ce-block[data-ce-state="expanded"] .ce-fold-btn,
-.ce-img-wrap[data-ce-img="unfolded"] .ce-img-btn {
-  position: -webkit-sticky;
-  position: sticky;
-  bottom: 8px;
-  left: auto;
-  right: auto;
-  transform: none;
-  display: flex;
-  margin: 8px auto 0;
-  width: fit-content;
-}
-
-/* 缺陷5：祖先存在滚动容器导致 sticky 失效时，降级为 absolute 定位，
-   保证展开按钮始终位于图片底部、可点击 */
-.ce-img-wrap.ce-no-sticky[data-ce-img="unfolded"] .ce-img-btn {
-  position: absolute;
-  bottom: 8px;
+  bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
   margin: 0;
 }
 
+/* 展开态按钮：sticky 在容器底部（容器高时粘视口底部供折叠） */
+.ce-block[data-ce-state="expanded"] .ce-fold-btn,
+.ce-img-wrap[data-ce-img="unfolded"] .ce-img-btn,
+.ce-adorn[data-ce-state="expanded"] .ce-fold-btn {
+  position: -webkit-sticky;
+  position: sticky;
+  bottom: 8px;
+  margin: 8px auto 0;
+  width: fit-content;
+}
+
 /* ============================================================
-   按钮文字 + 图标（通过 ::after 注入）
+   sticky 失效降级：容器自身或祖先存在滚动容器
+   （overflow:hidden/scroll/auto，主题常见设置 overflow-x:hidden）
+   导致 sticky 无法生效时，展开态按钮降级为 absolute 锚定容器底部
+   —— 不脱离容器（绝不出现"按钮独立显示在视口"的情况）
+   —— 用户需滚动到代码末尾才能点击折叠（这是降级方案的代价）
    ============================================================ */
 
-.ce-block[data-ce-state="collapsed"] .ce-fold-btn-text::after {
+.ce-block.ce-no-sticky[data-ce-state="expanded"] .ce-fold-btn,
+.ce-img-wrap.ce-no-sticky[data-ce-img="unfolded"] .ce-img-btn,
+.ce-adorn.ce-no-sticky[data-ce-state="expanded"] .ce-fold-btn {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  z-index: 3;
+}
+
+/* adorn 模式：给主题已有的 figure 容器加折叠控制 */
+.ce-adorn {
+  position: relative;  /* 供 absolute 按钮锚定（折叠/展开态均需要） */
+  container-type: inline-size;
+}
+.ce-adorn[data-ce-state="collapsed"] {
+  max-height: var(--ce-fold-h, 320px);
+  overflow: clip;
+  transition: max-height 0.35s ease;
+}
+@supports not (overflow: clip) {
+  .ce-adorn[data-ce-state="collapsed"] { overflow: hidden; }
+}
+.ce-adorn[data-ce-state="expanded"] {
+  max-height: none;
+  overflow: visible;
+  transition: max-height 0.35s ease;
+}
+
+/* ============================================================
+   折叠按钮文字 + 图标（通过 ::after 注入）
+   ce-block（新建包装）与 ce-adorn（主题自带 figure）共用同一组文案
+   ============================================================ */
+.ce-block[data-ce-state="collapsed"] .ce-fold-btn-text::after,
+.ce-adorn[data-ce-state="collapsed"] .ce-fold-btn-text::after {
   content: "展开代码";
 }
-
-.ce-block[data-ce-state="collapsed"] .ce-fold-btn-icon::after {
+.ce-block[data-ce-state="collapsed"] .ce-fold-btn-icon::after,
+.ce-adorn[data-ce-state="collapsed"] .ce-fold-btn-icon::after {
   content: "▼";
 }
-
-.ce-block[data-ce-state="expanded"] .ce-fold-btn-text::after {
+.ce-block[data-ce-state="expanded"] .ce-fold-btn-text::after,
+.ce-adorn[data-ce-state="expanded"] .ce-fold-btn-text::after {
   content: "折叠代码";
 }
-
-.ce-block[data-ce-state="expanded"] .ce-fold-btn-icon::after {
+.ce-block[data-ce-state="expanded"] .ce-fold-btn-icon::after,
+.ce-adorn[data-ce-state="expanded"] .ce-fold-btn-icon::after {
   content: "▲";
 }
 
@@ -220,11 +261,6 @@
 /* ============================================================
    动效与辅助功能
    ============================================================ */
-@keyframes ce-pop-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
 .ce-fold-btn:focus-visible,
 .ce-img-btn:focus-visible {
   outline: 2px solid #60a0ff;
@@ -235,22 +271,21 @@
 @media (prefers-reduced-motion: reduce) {
   .ce-pre,
   .ce-img-wrap,
-  .ce-fold-btn,
-  .ce-img-btn {
+  .ce-adorn[data-ce-state="collapsed"],
+  .ce-adorn[data-ce-state="expanded"] {
     transition: none;
-  }
-  .ce-fold-btn,
-  .ce-img-btn {
-    animation: none;
   }
 }
 
 /* ============================================================
-   响应式
+   响应式 — @container 查询适配按钮尺寸
    ============================================================ */
+
+/* 保留 @media 作为不支持 @container 浏览器的兜底 */
 @media (max-width: 768px) {
   .ce-block .ce-fold-btn,
-  .ce-img-wrap .ce-img-btn {
+  .ce-img-wrap .ce-img-btn,
+  .ce-adorn .ce-fold-btn {
     padding: 5px 12px;
     font-size: 12px;
     min-height: 34px;
@@ -263,9 +298,36 @@
     border-radius: 6px;
   }
   .ce-block .ce-fold-btn,
-  .ce-img-wrap .ce-img-btn {
+  .ce-img-wrap .ce-img-btn,
+  .ce-adorn .ce-fold-btn {
     padding: 4px 10px;
     font-size: 11px;
     min-height: 32px;
+  }
+}
+
+/* 渐进增强：支持 @container 的浏览器按容器宽度而非视口宽度响应 */
+@supports (container-type: inline-size) {
+  @container (max-width: 560px) {
+    .ce-block .ce-fold-btn,
+    .ce-img-wrap .ce-img-btn,
+    .ce-adorn .ce-fold-btn {
+      padding: 5px 12px;
+      font-size: 12px;
+      min-height: 34px;
+    }
+  }
+  @container (max-width: 380px) {
+    .ce-block {
+      margin: 10px 0;
+      border-radius: 6px;
+    }
+    .ce-block .ce-fold-btn,
+    .ce-img-wrap .ce-img-btn,
+    .ce-adorn .ce-fold-btn {
+      padding: 4px 10px;
+      font-size: 11px;
+      min-height: 32px;
+    }
   }
 }

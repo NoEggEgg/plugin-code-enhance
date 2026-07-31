@@ -15,7 +15,6 @@ import run.halo.app.plugin.ReactiveSettingFetcher;
 import run.halo.app.theme.dialect.TemplateHeadProcessor;
 
 import java.util.Properties;
-import java.util.Set;
 import jakarta.validation.constraints.Min;
 
 @Component
@@ -25,8 +24,6 @@ import jakarta.validation.constraints.Min;
 public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
 
     static final PropertyPlaceholderHelper PHP = new PropertyPlaceholderHelper("${", "}");
-    private static final Set<String> CTX = Set.of("post", "page", "moments", "doc");
-
     private static final String BASE = """
         <link rel="stylesheet" href="/plugins/${name}/assets/styles/code-enhance.css?v=${version}"/>
         <script defer src="/plugins/${name}/assets/js/code-enhance.js?v=${version}"></script>""";
@@ -47,13 +44,24 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
     @Override
     @SuppressWarnings("null")
     public Mono<Void> process(ITemplateContext c, IModel m, IElementModelStructureHandler h) {
-        if (!isContent(c)) return Mono.empty();
         return fetcher.fetch("basic", BasicConfig.class)
             .defaultIfEmpty(new BasicConfig())
             .filter(BasicConfig::hasAny)
-            .doOnNext(cfg -> inject(c, m, cfg))
-            .onErrorResume(e -> { log.error("process failed", e); return Mono.empty(); })
+            .doOnNext(cfg -> {
+                sanitizeConfig(cfg);
+                inject(c, m, cfg);
+            })
+            .onErrorResume(e -> {
+                log.error("CodeEnhance inject failed, fallback to defaults", e);
+                injectFallback(c, m);
+                return Mono.empty();
+            })
             .then();
+    }
+
+    private void sanitizeConfig(BasicConfig cfg) {
+        if (cfg.codeFoldLine < 1) cfg.codeFoldLine = 20;
+        if (cfg.imgFoldHeight < 1) cfg.imgFoldHeight = 400;
     }
 
     private void inject(ITemplateContext c, IModel m, BasicConfig cfg) {
@@ -72,13 +80,19 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
         m.add(c.getModelFactory().createText(b.toString()));
     }
 
-    private boolean isContent(ITemplateContext c) {
-        var id = c.getVariable("_templateId");
-        return (id != null && CTX.contains(id))
-            || c.getVariable("post") != null
-            || c.getVariable("singlePage") != null
-            || c.getVariable("docInfo") != null
-            || c.getVariable("moments") != null;
+    private void injectFallback(ITemplateContext c, IModel m) {
+        Properties p = new Properties();
+        p.setProperty("name", ctx.getName());
+        p.setProperty("version", ctx.getVersion());
+        p.setProperty("enableCodeFold", "true");
+        p.setProperty("enableImgFold", "true");
+        p.setProperty("codeFoldLine", "20");
+        p.setProperty("imgFoldHeight", "400");
+        StringBuilder b = new StringBuilder("\n<!-- PluginCodeEnhance start (fallback) -->\n");
+        b.append(PHP.replacePlaceholders(CONFIG, p));
+        b.append(PHP.replacePlaceholders(BASE, p));
+        b.append("<!-- PluginCodeEnhance end -->\n");
+        m.add(c.getModelFactory().createText(b.toString()));
     }
 
     @Data
