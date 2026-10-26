@@ -29,3 +29,8 @@ spec:
           value: 400
           min: 1
           help: 超过此高度的图片将自动折叠
+        - $formkit: switch
+          name: rememberFoldState
+          label: 记住代码块展开状态
+          value: true
+          help: 读者展开某个代码块后，刷新页面或站内跳转返回时保持展开（仅存于浏览器本地）

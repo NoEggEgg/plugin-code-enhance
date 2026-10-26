@@ -34,7 +34,8 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
             enableCodeFold: ${enableCodeFold},
             enableImgFold: ${enableImgFold},
             codeFoldLine: ${codeFoldLine},
-            imgFoldHeight: ${imgFoldHeight}
+            imgFoldHeight: ${imgFoldHeight},
+            rememberFoldState: ${rememberFoldState}
         };
         </script>""";
 
@@ -72,6 +73,7 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
         p.setProperty("enableImgFold", String.valueOf(cfg.enableImgFold));
         p.setProperty("codeFoldLine", String.valueOf(cfg.codeFoldLine));
         p.setProperty("imgFoldHeight", String.valueOf(cfg.imgFoldHeight));
+        p.setProperty("rememberFoldState", String.valueOf(cfg.rememberFoldState));
 
         StringBuilder b = new StringBuilder("\n<!-- PluginCodeEnhance start -->\n");
         b.append(PHP.replacePlaceholders(CONFIG, p));
@@ -88,6 +90,7 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
         p.setProperty("enableImgFold", "true");
         p.setProperty("codeFoldLine", "20");
         p.setProperty("imgFoldHeight", "400");
+        p.setProperty("rememberFoldState", "true");
         StringBuilder b = new StringBuilder("\n<!-- PluginCodeEnhance start (fallback) -->\n");
         b.append(PHP.replacePlaceholders(CONFIG, p));
         b.append(PHP.replacePlaceholders(BASE, p));
@@ -103,6 +106,7 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
         private int codeFoldLine = 20;
         @Min(1)
         private int imgFoldHeight = 400;
+        private boolean rememberFoldState = true;
 
         public boolean hasAny() { return enableCodeFold || enableImgFold; }
     }

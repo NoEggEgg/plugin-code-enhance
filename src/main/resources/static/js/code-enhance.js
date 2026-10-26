@@ -6,7 +6,8 @@
     enableCodeFold: true,
     enableImgFold: true,
     codeFoldLine: 20,
-    imgFoldHeight: 400
+    imgFoldHeight: 400,
+    rememberFoldState: true
   };
 
   // ====== 命名常量 ======
@@ -34,6 +35,7 @@
     if (!cfg) return;
     if (cfg.enableCodeFold === false) config.enableCodeFold = false;
     if (cfg.enableImgFold === false) config.enableImgFold = false;
+    if (cfg.rememberFoldState === false) config.rememberFoldState = false;
     config.codeFoldLine = clampInt(cfg.codeFoldLine, 20);
     config.imgFoldHeight = clampInt(cfg.imgFoldHeight, 400);
   }
@@ -195,29 +197,51 @@
   }
 
   /**
+   * 判断元素是否为「真实滚动容器」：overflow 为 auto/scroll 且内容确实溢出。
+   * 这类容器是 sticky 的合法作用域——sticky 会相对它的可视区吸附，
+   * 因此既不能把它改成 clip（会直接废掉主题的滚动，正文被裁剪且不可达），
+   * 也不能判定为 sticky 失效。
+   * 典型场景：部分主题把正文放在 <article> 等内部滚动容器里
+   * （实测原始 overflow:auto、scrollHeight 9134 > clientHeight 710）。
+   */
+  function isRealScroller(el) {
+    var cs = getComputedStyle(el);
+    var scrollable = cs.overflow === 'auto' || cs.overflow === 'scroll' ||
+      cs.overflowX === 'auto' || cs.overflowX === 'scroll' ||
+      cs.overflowY === 'auto' || cs.overflowY === 'scroll';
+    if (!scrollable) return false;
+    return el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1;
+  }
+
+  function overflowBlocks(el) {
+    var cs = getComputedStyle(el);
+    return (cs.overflow !== 'visible' && cs.overflow !== 'clip') ||
+      (cs.overflowX !== 'visible' && cs.overflowX !== 'clip') ||
+      (cs.overflowY !== 'visible' && cs.overflowY !== 'clip');
+  }
+
+  /**
    * 检测 sticky 是否会被自身或祖先的滚动容器阻断。
    * 从 el 自身开始遍历（而非 parentElement）：因为展开态按钮是 el 的直接子元素，
    * sticky 定位相对最近滚动祖先生效，el 自身若有 overflow:hidden（如旧浏览器
    * 不支持 overflow:clip 时的 fallback），同样会使按钮无法粘住视口。
    * overflow:clip 不算滚动容器（不阻断 sticky），仅 hidden/scroll/auto 阻断。
    *
-   * 关键边界：遍历到 body/html 即停止（不检查它们）。body 和 html 都是页面
+   * 关键边界 1：遍历到 body/html 即停止（不检查它们）。body 和 html 都是页面
    * 最外层滚动容器，sticky 相对它们/视口仍然正常生效；而大量主题会给
    * body/html 设 overflow:hidden 或 overflow-x:hidden 来隐藏横向溢出/让
    * 文档可滚动，若把它们算作阻断会导致全站按钮误降级为 absolute
-   * （实测 theme-kaze 的 <html> 有 overflow-y:auto，被误判后按钮
+   * （实测部分主题的 <html> 有 overflow-y:auto，被误判后按钮
    *   sticky 劫持到文档底部而非视口）。
+   * 关键边界 2：遇到「真实滚动容器」立即判定为不阻断并停止上溯——它就是
+   * sticky 的作用域，按钮会吸附在该容器可视区底部，属于正常生效而非失效。
    * 阻断时给容器加 ce-no-sticky 类，CSS 降级为 absolute 锚定容器底部。
    */
   function stickyBlocked(el) {
     var p = el;
     while (p && p !== document.body && p !== document.documentElement) {
-      var cs = getComputedStyle(p);
-      if ((cs.overflow !== 'visible' && cs.overflow !== 'clip') ||
-          (cs.overflowX !== 'visible' && cs.overflowX !== 'clip') ||
-          (cs.overflowY !== 'visible' && cs.overflowY !== 'clip')) {
-        return true;
-      }
+      if (isRealScroller(p)) return false;
+      if (overflowBlocks(p)) return true;
       p = p.parentElement;
     }
     return false;
@@ -242,10 +266,10 @@
     }
     var p = el;
     while (p && p !== document.body && p !== document.documentElement) {
-      var cs = getComputedStyle(p);
-      var blocked = (cs.overflow !== 'visible' && cs.overflow !== 'clip') ||
-        (cs.overflowX !== 'visible' && cs.overflowX !== 'clip') ||
-        (cs.overflowY !== 'visible' && cs.overflowY !== 'clip');
+      // 真实滚动容器：sticky 在此作用域内本就生效，绝不能改成 clip
+      // （否则主题正文被裁剪且无法滚动，属严重回归）
+      if (isRealScroller(p)) break;
+      var blocked = overflowBlocks(p);
       if (blocked) {
         // 保存原始 overflow，供 removeWrapper 恢复
         if (!p.hasAttribute('data-ce-orig-overflow')) {
@@ -262,6 +286,60 @@
     if (stickyBlocked(el)) el.classList.add('ce-no-sticky');
   }
 
+  // ====== 折叠状态记忆 ======
+  // 按页面路径记录哪些代码块被读者展开过，刷新 / pjax 往返后恢复。
+  // 索引以文档中 pre > code 的出现顺序为准，与异步处理顺序无关。
+  var STATE_PREFIX = 'ce-fold:';
+
+  function stateKey() {
+    return STATE_PREFIX + location.pathname;
+  }
+
+  function readStates() {
+    try {
+      return JSON.parse(localStorage.getItem(stateKey()) || '{}') || {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveState(idx, expanded) {
+    if (!config.rememberFoldState) return;
+    if (idx === null || idx === undefined) return;
+    try {
+      var m = readStates();
+      if (expanded) {
+        m[idx] = 1;
+      } else {
+        delete m[idx];
+      }
+      // 限制条目数，避免长期累积占满配额
+      var keys = Object.keys(m);
+      if (keys.length > 60) {
+        keys.slice(0, keys.length - 60).forEach(function (k) { delete m[k]; });
+      }
+      localStorage.setItem(stateKey(), JSON.stringify(m));
+    } catch (e) {
+      // 隐私模式 / 配额不足：静默降级为不记忆
+    }
+  }
+
+  function codeIndex(codeEl) {
+    var codes = document.querySelectorAll('pre > code');
+    return Array.prototype.indexOf.call(codes, codeEl);
+  }
+
+  /** 若该块上次被读者展开过，则恢复展开态 */
+  function restoreFoldState(container, idx) {
+    if (!config.rememberFoldState) return;
+    if (idx === null || idx < 0) return;
+    if (!readStates()[idx]) return;
+    container.setAttribute('data-ce-state', 'expanded');
+    container.classList.add('ce-unfold');
+    var fb = container.querySelector('.ce-fold-btn');
+    if (fb) fb.setAttribute('aria-expanded', 'true');
+  }
+
   function toggleFold(w) {
     var s = w.getAttribute('data-ce-state');
     var next = s === 'collapsed' ? 'expanded' : 'collapsed';
@@ -271,18 +349,34 @@
     if (fb) {
       fb.setAttribute('aria-expanded', next === 'expanded' ? 'true' : 'false');
       // 同步更新 aria-label，与按钮实际显示文字一致
-      fb.setAttribute('aria-label', next === 'expanded' ? I18N.foldCollapse : I18N.foldExpand);
+      var remain = fb.getAttribute('data-ce-remain');
+      fb.setAttribute('aria-label', next === 'expanded'
+        ? I18N.foldCollapse
+        : (remain ? I18N.foldExpand + '\uFF0C\u5269\u4F59 ' + remain + ' \u884C' : I18N.foldExpand));
     }
+    saveState(w.getAttribute('data-ce-index'), next === 'expanded');
   }
 
   /**
    * 给代码块容器（figure/ce-block）创建并追加折叠按钮（adorn 与 wrapper 共用）
    * @param {HTMLElement} container 折叠容器（fig 或 wrapper）
+   * @param {number} remain 被隐藏的行数（>0 时在按钮上显示）
+   * @param {number} idx 代码块在文档中的序号，用于状态记忆
    */
-  function appendFoldBtn(container) {
+  function appendFoldBtn(container, remain, idx) {
     if (container.querySelector('.ce-fold-btn')) return;
     var btn = createBtn('fold', function () { toggleFold(container); });
     btn.setAttribute('aria-label', I18N.foldExpand);
+    if (idx !== undefined && idx !== null && idx >= 0) {
+      container.setAttribute('data-ce-index', String(idx));
+    }
+    if (remain > 0) {
+      // 按钮与文案元素都要带：CSS 的 attr() 只对承载 ::after 的元素生效
+      btn.setAttribute('data-ce-remain', String(remain));
+      var txt = btn.querySelector('.ce-fold-btn-text');
+      if (txt) txt.setAttribute('data-ce-remain', String(remain));
+      btn.setAttribute('aria-label', I18N.foldExpand + '\uFF0C\u5269\u4F59 ' + remain + ' \u884C');
+    }
     container.appendChild(btn);
   }
 
@@ -290,14 +384,39 @@
    * 给主题已有的 figure 容器加上折叠功能（adorn 模式）
    * 不创建新包装，只在现有 figure 上加 data-* 属性和折叠按钮
    */
-  function adornCodeBlock(fig, codeEl) {
+  function adornCodeBlock(fig, codeEl, lc) {
     fig.classList.add('ce-adorn');
     var preEl = codeEl.parentElement;
     preEl.style.setProperty('--ce-fold-h', calcFoldHeight(codeEl, preEl));
-    appendFoldBtn(fig);
+    var idx = codeIndex(codeEl);
+    appendFoldBtn(fig, lc - config.codeFoldLine, idx);
     fig.setAttribute('data-ce-state', 'collapsed');
     // 保证按钮走 sticky 路径；overflow 阻断时优先用 clip 修复，无法修复才降级
     ensureSticky(fig);
+    restoreFoldState(fig, idx);
+  }
+
+  /**
+   * 已存在折叠控件的选择器集合，命中则跳过该代码块，避免出现两套折叠控件。
+   * - .expand-done / [class*="fold-btn"]：主题自带折叠
+   * - .ce-fold-btn：本插件自身（幂等保护）
+   * - .fold-tail-control / .fold-start：官方 shiki 插件 v1.4+ 的折叠标记控件
+   *   （对应 Markdown 里的 [!code fold:start] / [!code fold:end]）
+   *   注意其类名**不含** "fold-btn"，必须显式列出，否则与 shiki 折叠重复
+   */
+  var EXISTING_FOLD_SEL = [
+    '.expand-done',
+    '.ce-fold-btn',
+    '[class*="fold-btn"]',
+    '[class*="fold-control"]',
+    '.fold-tail-control',
+    '.fold-start'
+  ].join(', ');
+
+  function hasExistingFoldControl(el) {
+    if (!el) return false;
+    if (el.classList && el.classList.contains('fold')) return true;
+    return !!el.querySelector(EXISTING_FOLD_SEL);
   }
 
   function processCode(codeEl) {
@@ -307,22 +426,21 @@
     var preEl = codeEl.parentElement;
     if (!preEl) return;
 
+    // 已有折叠控件（主题自带 / shiki 折叠标记）→ 跳过。
+    // 同时检查 figure 与 pre 两个层级：shiki 等插件可能把控件直接渲染在 pre 内。
+    if (hasExistingFoldControl(preEl.closest('figure')) || hasExistingFoldControl(preEl)) return;
+
     // 主题可能有多层包装（figure > div > pre），使用 closest 定位祖先 figure
     var fig = preEl.closest('figure');
+    var lc = codeEl.textContent.replace(/\n$/, '').split('\n').length;
+
     if (fig) {
-      // 主题已自带折叠控件 → 跳过
-      if (fig.classList.contains('fold') || fig.querySelector('.expand-done, .ce-fold-btn, [class*="fold-btn"]')) {
-        return;
-      }
       // 主题有包装无折叠 → 给现有 figure 补折叠
-      var lc = codeEl.textContent.replace(/\n$/, '').split('\n').length;
       if (lc > config.codeFoldLine) {
-        adornCodeBlock(fig, codeEl);
+        adornCodeBlock(fig, codeEl, lc);
       }
       return;
     }
-
-    var lc = codeEl.textContent.replace(/\n$/, '').split('\n').length;
 
     // 行数未超过阈值：不折叠，若之前被包装过则移除包装
     if (lc <= config.codeFoldLine) {
@@ -336,9 +454,11 @@
     var wrapper = ensureWrapper(preEl);
     preEl.style.setProperty('--ce-fold-h', calcFoldHeight(codeEl, preEl));
 
-    appendFoldBtn(wrapper);
+    var idx = codeIndex(codeEl);
+    appendFoldBtn(wrapper, lc - config.codeFoldLine, idx);
     wrapper.setAttribute('data-ce-state', 'collapsed');
     ensureSticky(wrapper);
+    restoreFoldState(wrapper, idx);
   }
 
   // ====== 长图折叠 ======

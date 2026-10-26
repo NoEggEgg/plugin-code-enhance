@@ -3,7 +3,7 @@ kind: Plugin
 metadata:
   name: PluginCodeEnhance
 spec:
-  version: 2.0.3
+  # version 由构建注入（build.gradle 的 version），此处不再硬编码，避免双写漂移
   enabled: true
   requires: ">=2.20.0"
   author:

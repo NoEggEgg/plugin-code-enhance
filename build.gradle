@@ -1,11 +1,11 @@
 plugins {
     id 'java'
     id 'run.halo.plugin.devtools' version '0.8.0'
-    id 'io.freefair.lombok' version '8.13.1'
+    id 'io.freefair.lombok' version '8.14.4'
 }
 
 group 'run.halo.codeenhance'
-version '2.0.3'
+version '2.1.0'
 
 java {
     toolchain {
@@ -21,7 +21,7 @@ repositories {
 }
 
 dependencies {
-    implementation platform('run.halo.tools.platform:plugin:2.25.0')
+    implementation platform('run.halo.tools.platform:plugin:2.27.1')
     compileOnly 'run.halo.app:api'
     testImplementation 'run.halo.app:api'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
@@ -39,9 +39,23 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 halo {
-    version = '2.25'
+    version = '2.27'
     superAdminUsername = 'admin'
     superAdminPassword = 'admin'
     port = 8090
     externalUrl = 'http://localhost:8090'
+}
+
+/**
+ * 发布归档：把当前版本的 JAR 复制到 版本管理/。
+ * 版本号取自 build.gradle 的 version，避免手工拷贝时命名不一致。
+ * 用法：./gradlew archiveRelease
+ */
+tasks.register('archiveRelease', Copy) {
+    group = 'halo plugin'
+    description = '归档当前版本的插件 JAR 到 版本管理/'
+    dependsOn tasks.named('build')
+    from layout.buildDirectory.dir('libs')
+    include "plugin-codeenhance-${version}.jar"
+    into layout.projectDirectory.dir('版本管理')
 }

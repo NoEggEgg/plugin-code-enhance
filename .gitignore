@@ -76,3 +76,14 @@ backup-v232-20260731-114115/
 # ==================== 本地配置 ====================
 local.properties
 *.local
+
+# ==================== 本地 Halo 验证实例 ====================
+halo-server-227/
+.workbuddy-ai/
+
+# ==================== 本地/内部资料（不推送远程） ====================
+docs/evidence/
+docs/调研*
+docs/release-2.1.0-store-notes.md
+tools/
+set-theme.js

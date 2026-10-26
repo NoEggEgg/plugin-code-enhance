@@ -331,3 +331,33 @@
     }
   }
 }
+
+/* ============================================================
+   折叠态按钮文案增强：显示被隐藏的行数
+   数字由 JS 写到 .ce-fold-btn-text 的 data-ce-remain 上
+   （attr() 只对承载 ::after 的元素生效，故不能写在按钮上）
+   文案刻意保持短：按钮绝对定位在截断处之上，越长遮挡正文越多
+   （实测「展开代码 · 剩 N 行」141px 遮挡 26%，「展开 · N 行」102px 遮挡 19%）
+   ============================================================ */
+.ce-block[data-ce-state="collapsed"] .ce-fold-btn-text[data-ce-remain]::after,
+.ce-adorn[data-ce-state="collapsed"] .ce-fold-btn-text[data-ce-remain]::after {
+  content: "展开 · " attr(data-ce-remain) " 行";
+}
+
+/* ============================================================
+   打印：强制展开全部折叠内容并隐藏按钮
+   折叠态靠 max-height 截断，若不放开，打印/导出 PDF 只能得到前几行
+   ============================================================ */
+@media print {
+  .ce-block[data-ce-state="collapsed"] .ce-pre,
+  .ce-adorn[data-ce-state="collapsed"],
+  .ce-img-wrap[data-ce-img="folded"] {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .ce-block .ce-fold-btn,
+  .ce-adorn .ce-fold-btn,
+  .ce-img-wrap .ce-img-btn {
+    display: none !important;
+  }
+}

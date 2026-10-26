@@ -18,6 +18,9 @@ Halo 博客平台的代码折叠增强插件，专注提供**代码块折叠**�
 - **移动端适配**：按钮尺寸优化，触摸友好
 - **性能优化**：使用 `IntersectionObserver` 延迟初始化，无外部依赖，JS 约 23KB（相比 v1.x 移除高亮库后显著减小）
 - **pjax 兼容**：自动监听 `pjax:complete` 事件，支持 Halo 默认主题的 pjax 路由切换
+- **展开状态记忆**：读者展开过的代码块，刷新或站内跳转返回后保持展开（可在后台关闭）
+- **打印自动展开**：打印 / 导出 PDF 时折叠内容自动展开并隐藏按钮，不会被截断
+- **剩余行数提示**：折叠按钮显示被隐藏的行数，便于判断是否值得展开
 
 ---
 
@@ -25,7 +28,7 @@ Halo 博客平台的代码折叠增强插件，专注提供**代码块折叠**�
 
 ### 方法一：手动安装
 
-1. 下载最新版本的插件 JAR 文件（`plugin-codeenhance-2.0.3.jar`）
+1. 下载最新版本的插件 JAR 文件（`plugin-codeenhance-2.1.0.jar`）
 2. 登录 Halo 管理后台
 3. 进入「插件管理」→「安装插件」
 4. 选择下载的 JAR 文件上传安装
@@ -41,7 +44,7 @@ cd plugin-code-enhance
 # 构建插件
 ./gradlew build -x test
 
-# 构建产物位于 build/libs/plugin-codeenhance-2.0.3.jar
+# 构建产物位于 build/libs/plugin-codeenhance-2.1.0.jar
 ```
 
 ---
@@ -56,6 +59,7 @@ cd plugin-code-enhance
 | `codeFoldLine` | 代码折叠阈值（行数） | `20` |
 | `enableImgFold` | 是否启用长图折叠 | `true` |
 | `imgFoldHeight` | 图片折叠阈值（像素） | `400` |
+| `rememberFoldState` | 记住代码块展开状态（仅存浏览器本地） | `true` |
 
 > **说明**：自 v2.0.0 起，所有功能默认启用。代码折叠和长图折叠独立控制，互不影响。
 
@@ -87,10 +91,18 @@ cd plugin-code-enhance
 
 ## 🛠️ 技术栈
 
-- **Halo**：>=2.20.0
+- **Halo**：>=2.20.0（已在 2.25.x / 2.27.x 验证）
 - **Java**：21
-- **Gradle**：8.5
+- **构建**：Gradle 8.5
 - **前端**：原生 JavaScript（无框架）+ CSS 变量
+
+---
+
+## ✅ 兼容性
+
+- 已在 **Halo 2.25.x** 与 **2.27.x** 实机验证通过，向前兼容至 2.20.0
+- 跨主题覆盖：涵盖文档流滚动、内部滚动容器、主题自带 `figure` 包装等不同布局结构
+- 已知限制：主题在 `body` 上设置 `overflow-x: hidden` 时会使 `sticky` 失效，展开态按钮退化为停在容器底部（无布局破损，仅需滚到代码末尾才能折叠）
 
 ---
 
@@ -161,12 +173,23 @@ public class CodeEnhanceHeadProcessor implements TemplateHeadProcessor {
 
 - 无外部依赖（不依赖 hljs、jQuery 等），JS 约 23KB
 - 使用 CSS 变量管理配色，自动适配暗色主题
-- 分状态定位：折叠态 `absolute` 锚定容器底部中央，展开态 `sticky` 粘视口底部（被 `overflow` 阻断时以 `overflow:clip` 修复或降级 `absolute`，按钮永不脱离容器）
+- 分状态定位：折叠态 `absolute` 锚定容器底部中央，展开态 `sticky` 粘视口底部（被 `overflow:hidden` 阻断时以 `overflow:clip` 修复或降级 `absolute`；主题的真实滚动容器 `auto`/`scroll` 不改写，sticky 在其作用域内正常吸附，按钮永不脱离容器）
 - 完整 ARIA 支持，提升无障碍体验
 
 ---
 
 ## 版本更新
+
+### v2.1.0 (2026-10-26)
+
+**🔧 体验增强 + 兼容性维护：适配 Halo 2.27、与 Shiki 折叠共存**
+
+- **新增：展开状态记忆**——读者展开过的代码块，刷新页面或站内跳转返回后保持展开。状态只存在浏览器 `localStorage`（按页面路径 + 代码块序号），不上传服务端；可在后台「记住代码块展开状态」中关闭
+- **新增：打印自动展开**——`@media print` 下强制展开所有折叠的代码块与长图并隐藏按钮。此前打印/导出 PDF 只能得到前几行
+- **新增：剩余行数提示**——折叠态按钮显示「展开 · N 行」，便于判断是否值得展开；同步更新 `aria-label`
+- **适配 Halo 2.27**：构建基线同步至 Halo 2.27，已在 2.25.x 与 2.27.x 实机验证兼容
+- **与官方 Shiki 插件折叠共存**：识别 Shiki 的 `[!code fold:start]` 折叠控件（类名 `.fold-tail-control` / `.fold-start`），命中则跳过该代码块，避免出现两套折叠控件；Shiki 已启用但无折叠标记的代码块仍照常自动折叠
+- **修复：部分主题下文章正文被裁剪、无法滚动（重要）**：旧版为让折叠按钮吸底，会把阻断 `sticky` 的祖先元素 `overflow` 改为 `clip`，对 `overflow: hidden` 视觉等价，但会废掉 `overflow: auto / scroll` 真实滚动容器的滚动能力，导致正文被裁剪、内容不可达。现已识别真实滚动容器并完全跳过改写
 
 ### v2.0.3 (2026-07-31)
 
